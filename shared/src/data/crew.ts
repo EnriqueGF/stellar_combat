@@ -1,0 +1,87 @@
+import type { CrewClassDef, CrewClassId } from '../types.js'
+
+// GAME_SPEC §3.6 — 4 miembros por nave, clases con 3 niveles. Técnico: NO implementado (GDD pendiente).
+
+export const CREW_CLASSES: Record<CrewClassId, CrewClassDef> = {
+  pilot: {
+    id: 'pilot',
+    name: 'Piloto',
+    desc: 'Aumenta la evasión cuando tripula la cabina.',
+    hpMax: [100, 100, 100],
+    repairMult: [1, 1, 1],
+    fireMult: [1, 1, 1],
+    pilotEvasion: [0.05, 0.08, 0.12],
+    gunneryMult: [1, 1, 1],
+    medbayMult: [1, 1, 1],
+    fieldHeal: [0, 0, 0],
+  },
+  engineer: {
+    id: 'engineer',
+    name: 'Ingeniero',
+    desc: 'Repara sistemas mucho más rápido.',
+    hpMax: [100, 100, 100],
+    repairMult: [1.25, 1.5, 2],
+    fireMult: [1, 1, 1],
+    pilotEvasion: [0, 0, 0],
+    gunneryMult: [1, 1, 1],
+    medbayMult: [1, 1, 1],
+    fieldHeal: [0, 0, 0],
+  },
+  gunner: {
+    id: 'gunner',
+    name: 'Artillero',
+    desc: 'Acelera la carga de las armas al tripular la sala de armas.',
+    hpMax: [100, 100, 100],
+    repairMult: [1, 1, 1],
+    fireMult: [1, 1, 1],
+    pilotEvasion: [0, 0, 0],
+    gunneryMult: [1.1, 1.2, 1.3],
+    medbayMult: [1, 1, 1],
+    fieldHeal: [0, 0, 0],
+  },
+  medic: {
+    id: 'medic',
+    name: 'Médico',
+    desc: 'Potencia la bahía médica y cura a compañeros en su sala.',
+    hpMax: [100, 100, 100],
+    repairMult: [1, 1, 1],
+    fireMult: [1, 1, 1],
+    pilotEvasion: [0, 0, 0],
+    gunneryMult: [1, 1, 1],
+    medbayMult: [1.5, 2, 3],
+    fieldHeal: [1, 2, 3],
+  },
+  soldier: {
+    id: 'soldier',
+    name: 'Soldado',
+    desc: 'Resistente y experto apagando incendios.',
+    hpMax: [125, 140, 160],
+    repairMult: [1, 1, 1],
+    fireMult: [1.5, 2, 3],
+    pilotEvasion: [0, 0, 0],
+    gunneryMult: [1, 1, 1],
+    medbayMult: [1, 1, 1],
+    fieldHeal: [0, 0, 0],
+  },
+}
+
+export const CREW_CLASS_IDS = Object.keys(CREW_CLASSES) as CrewClassId[]
+
+export const CREW_NAMES = [
+  'Vega',
+  'Orión',
+  'Lyra',
+  'Cassio',
+  'Nova',
+  'Altair',
+  'Mira',
+  'Deneb',
+  'Rigel',
+  'Sirio',
+  'Elara',
+  'Tycho',
+  'Andrómeda',
+  'Ícaro',
+  'Selene',
+  'Helio',
+] as const

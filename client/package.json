@@ -1,0 +1,21 @@
+{
+  "name": "@stellar/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/orbitron": "^5.1.1",
+    "@fontsource/share-tech-mono": "^5.1.1",
+    "@stellar/shared": "*",
+    "phaser": "^3.87.0",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}
