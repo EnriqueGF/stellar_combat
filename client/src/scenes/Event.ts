@@ -6,6 +6,7 @@ import Phaser from 'phaser'
 import { GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
+import { installRunEscapeMenu } from '../ui/escapeMenu'
 import { buildRunHeader, menuChrome, textStyle } from '../ui/helpers'
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
@@ -27,11 +28,12 @@ export class EventScene extends Phaser.Scene {
     }
     this.busy = false
     const node = run.sector.nodes.find((n) => n.id === run.currentNodeId)
-    menuChrome(this, {
+    const chrome = menuChrome(this, {
       biome: node?.biome ?? 'rocky',
       seed: node?.seed ?? 1,
       planet: { planetX: GAME_WIDTH * 0.18, planetY: GAME_HEIGHT * 0.75 },
     })
+    installRunEscapeMenu(this, chrome.crt)
     getAudio().music('menu')
 
     this.render()

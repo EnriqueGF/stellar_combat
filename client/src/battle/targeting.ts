@@ -1,7 +1,7 @@
 // Single input state machine for the battle (GAME_SPEC §6.3): weapon targeting
 // (crosshair + persistent target lines with slot badges) and crew move orders.
-// Selecting a weapon deselects the crew member and vice versa. ESC / right
-// click cancels; right click on a targeted room (or its slot) clears it.
+// Selecting a weapon deselects the crew member and vice versa. Right click
+// cancels the selection; right click on a targeted room (or its slot) clears it.
 // Targeting also works while the tactical pause is active.
 
 import type Phaser from 'phaser'
@@ -93,7 +93,8 @@ export class TargetingController {
     scene.input.on('pointermove', this.onPointerMove)
     scene.input.on('pointerdown', this.onPointerDown)
 
-    // Keyboard shortcuts: 1-4 select weapon, ESC cancels, A toggles autofire.
+    // Keyboard shortcuts: 1-4 select weapon, A toggles autofire. (ESC opens the
+    // escape menu now; right-click still cancels the current selection.)
     const kb = scene.input.keyboard
     if (kb !== null) {
       const keys: [string, number][] = [
@@ -105,7 +106,6 @@ export class TargetingController {
       for (const [event, slot] of keys) {
         kb.on(event, () => this.selectWeapon(slot))
       }
-      kb.on('keydown-ESC', () => this.clearSelection())
       kb.on('keydown-A', () => {
         if (this.selection.kind === 'weapon') {
           this.d.socket.emit('battle:toggle_autofire', this.selection.slot)

@@ -266,7 +266,7 @@ export class BottomHud {
     Tooltip.attach(
       helpZone,
       () =>
-        'Atajos de teclado:\n1-4: seleccionar arma (apuntar)\nESC / click derecho: cancelar\nA: autodisparo del arma seleccionada\nESPACIO: pausa táctica\nJ: cargar el salto (huir)',
+        'Atajos de teclado:\n1-4: seleccionar arma (apuntar)\nClick derecho: cancelar selección\nA: autodisparo del arma seleccionada\nESPACIO: pausa táctica\nJ: cargar el salto (huir)\nESC: menú (opciones · abandonar)',
     )
     this.disposables.push(helpZone)
 

@@ -8,6 +8,7 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
 import { Tooltip } from '../ui/tooltip'
+import { installRunEscapeMenu } from '../ui/escapeMenu'
 import {
   addText,
   buildRunHeader,
@@ -49,11 +50,12 @@ export class SectorMapScene extends Phaser.Scene {
     }
     this.choosing = false
     const current = run.sector.nodes.find((n) => n.id === run.currentNodeId)
-    menuChrome(this, {
+    const chrome = menuChrome(this, {
       biome: current?.biome ?? 'rocky',
       seed: current?.seed ?? 1,
       planet: { planetX: GAME_WIDTH * 0.82, planetY: GAME_HEIGHT * 0.3 },
     })
+    installRunEscapeMenu(this, chrome.crt)
     getAudio().music('menu')
 
     this.render()

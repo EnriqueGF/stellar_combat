@@ -4,21 +4,12 @@
 import Phaser from 'phaser'
 import type { PlanetBiome } from '@stellar/shared'
 import { PVP_LOADOUT_TIMEOUT_SEC } from '@stellar/shared'
-import { COLORS, GAME_HEIGHT, GAME_WIDTH, catColor } from '../theme'
+import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import type { LoadoutSceneData } from '../contracts'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
-import { Slider } from '../ui/slider'
-import { Toggle } from '../ui/toggle'
-import {
-  addText,
-  applyUiScale,
-  css,
-  drawCategoryIcon,
-  menuChrome,
-  textStyle,
-  type MenuChrome,
-} from '../ui/helpers'
+import { fillHowTo, fillOptions } from '../ui/overlays'
+import { addText, applyUiScale, css, menuChrome, type MenuChrome } from '../ui/helpers'
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
@@ -138,139 +129,15 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private openHowTo(): void {
-    const w = 860
-    const h = 600
-    const panel = this.openOverlay(w, h, 'CÓMO JUGAR')
-
-    const lines = [
-      '· EXPEDICIÓN: recorre un sector de 8 columnas eligiendo nodos; combate,',
-      '  comercia y mejora tu nave con chatarra hasta el jefe final.',
-      '· ENERGÍA: el reactor alimenta los sistemas. En batalla, haz clic en los',
-      '  pips de la barra inferior para asignar o retirar energía en vivo.',
-      '· TRIPULACIÓN: 4 especialistas que reparan, apagan fuegos y potencian',
-      '  sistemas. Clic en un tripulante y luego en una sala para moverlo.',
-      '· HUIDA: carga el salto (cabina tripulada + motores) para escapar,',
-      '  pero perderás el botín del nodo. En duelo cuenta como rendición.',
-      '· PAUSA TÁCTICA: ESPACIO pausa la batalla, solo contra la IA.',
-    ]
-    let y = panel.contentTop + 8
-    for (const line of lines) {
-      panel.add(this.add.text(20, y, line, textStyle('body', 15)))
-      y += 22
-    }
-
-    // Category triangle: shape + color + text per category (colorblind-safe).
-    y += 14
-    panel.add(
-      this.add.text(
-        20,
-        y,
-        'TRIÁNGULO DE CATEGORÍAS — cada una brilla (×1.25) contra una defensa:',
-        textStyle('title', 14, COLORS.panelBorder),
-      ),
-    )
-    y += 34
-    const entries: { cat: 'energy' | 'kinetic' | 'explosive'; text: string }[] = [
-      { cat: 'energy', text: 'ENERGÍA funde escudos · cadencia alta, sin munición' },
-      { cat: 'kinetic', text: 'CINÉTICO perfora cascos · proyectiles rápidos' },
-      { cat: 'explosive', text: 'EXPLOSIVO revienta sistemas · perfora escudos, gasta misiles' },
-    ]
-    for (const e of entries) {
-      const icon = drawCategoryIcon(this, 34, y + 9, e.cat, 18)
-      panel.add(icon)
-      panel.add(this.add.text(52, y, e.text, textStyle('body', 15, catColor(e.cat))))
-      y += 30
-    }
-    panel.add(
-      this.add.text(
-        20,
-        y + 6,
-        'Y flojea (×0.75) contra la siguiente: Energía→casco · Cinético→sistemas · Explosivo→escudos.',
-        textStyle('body', 13, COLORS.textDim),
-      ),
-    )
+    const panel = this.openOverlay(860, 600, 'CÓMO JUGAR')
+    fillHowTo(this, panel)
   }
 
   private openOptions(): void {
-    const w = 560
-    const h = 480
-    const panel = this.openOverlay(w, h, 'OPCIONES')
-    const state = getState()
-    const apply = (): void => {
-      state.saveSettings()
-      getAudio().applySettings(state.settings)
-    }
-
-    let y = panel.contentTop + 36
-    panel.add(
-      new Slider(this, 24, y, {
-        width: 300,
-        label: 'Volumen general',
-        value: state.settings.masterVolume,
-        onChange: (v) => {
-          state.settings.masterVolume = v
-          apply()
-        },
-      }),
-    )
-    y += 64
-    panel.add(
-      new Slider(this, 24, y, {
-        width: 300,
-        label: 'Música',
-        value: state.settings.musicVolume,
-        onChange: (v) => {
-          state.settings.musicVolume = v
-          apply()
-        },
-      }),
-    )
-    y += 64
-    panel.add(
-      new Slider(this, 24, y, {
-        width: 300,
-        label: 'Efectos de sonido',
-        value: state.settings.sfxVolume,
-        onChange: (v) => {
-          state.settings.sfxVolume = v
-          apply()
-          getAudio().play('click')
-        },
-      }),
-    )
-    y += 56
-    panel.add(
-      new Toggle(this, 35, y, 'Efecto CRT (scanlines)', state.settings.crtEnabled, (v) => {
-        state.settings.crtEnabled = v
-        state.saveSettings()
-        this.chrome?.crt.setEnabled(v)
-      }),
-    )
-    y += 52
-    panel.add(
-      new Slider(this, 24, y + 26, {
-        width: 300,
-        label: 'Escala de la interfaz (solo menús)',
-        min: 0.85,
-        max: 1.15,
-        step: 0.05,
-        value: state.settings.uiScale,
-        format: (v) => `${Math.round(v * 100)}%`,
-        onChange: (v) => {
-          state.settings.uiScale = v
-          state.saveSettings()
-          applyUiScale(this, v)
-        },
-      }),
-    )
-    y += 86
-    panel.add(
-      this.add.text(
-        24,
-        y,
-        'Accesibilidad: ninguna señal depende solo del color (formas + iconos +\ntexto), tooltips en toda la interfaz y pausa táctica contra la IA.',
-        textStyle('body', 13, COLORS.textDim),
-      ),
-    )
+    const panel = this.openOverlay(560, 484, 'OPCIONES')
+    fillOptions(this, panel, {
+      crt: this.chrome?.crt ?? null,
+      onUiScale: (v) => applyUiScale(this, v),
+    })
   }
 }

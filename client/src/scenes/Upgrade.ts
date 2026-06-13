@@ -18,6 +18,7 @@ import type { SystemId, UpgradeItem } from '@stellar/shared'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
+import { installRunEscapeMenu } from '../ui/escapeMenu'
 import {
   addText,
   buildRunHeader,
@@ -56,11 +57,12 @@ export class UpgradeScene extends Phaser.Scene {
     }
     this.busy = false
     const node = run.sector.nodes.find((n) => n.id === run.currentNodeId)
-    menuChrome(this, {
+    const chrome = menuChrome(this, {
       biome: node?.biome ?? 'ice',
       seed: node?.seed ?? 1,
       planet: { planetX: GAME_WIDTH * 0.88, planetY: GAME_HEIGHT * 0.25 },
     })
+    installRunEscapeMenu(this, chrome.crt)
     getAudio().music('menu')
 
     this.render()

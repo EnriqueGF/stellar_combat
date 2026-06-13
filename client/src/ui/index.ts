@@ -7,6 +7,16 @@ export { Toast } from './toast'
 export { Slider, type SliderOpts } from './slider'
 export { Toggle } from './toggle'
 export { ProgressBar, type ProgressBarOpts } from './progressbar'
+export { EscapeMenu, installRunEscapeMenu, type EscapeMenuOpts } from './escapeMenu'
+export {
+  openModal,
+  openOptions,
+  openHowTo,
+  fillOptions,
+  fillHowTo,
+  type ModalHandle,
+  type OptionsHooks,
+} from './overlays'
 export {
   addText,
   applyUiScale,

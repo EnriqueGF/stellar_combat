@@ -9,6 +9,7 @@ import type { CrewClassId, DroneId, ShopOffer, WeaponId } from '@stellar/shared'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
+import { installRunEscapeMenu } from '../ui/escapeMenu'
 import { addText, buildRunHeader, drawCategoryIcon, menuChrome, textStyle } from '../ui/helpers'
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
@@ -66,11 +67,12 @@ export class ShopScene extends Phaser.Scene {
     }
     this.busy = false
     const node = run.sector.nodes.find((n) => n.id === run.currentNodeId)
-    menuChrome(this, {
+    const chrome = menuChrome(this, {
       biome: node?.biome ?? 'desert',
       seed: node?.seed ?? 1,
       planet: { planetX: GAME_WIDTH * 0.85, planetY: GAME_HEIGHT * 0.8 },
     })
+    installRunEscapeMenu(this, chrome.crt)
     getAudio().music('menu')
 
     this.render()

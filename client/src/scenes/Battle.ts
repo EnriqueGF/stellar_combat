@@ -39,6 +39,7 @@ import { ShipView } from '../battle/shipView'
 import { TargetingController } from '../battle/targeting'
 import { TutorialController } from '../battle/tutorial'
 import { Toast, Tooltip } from '../battle/uiKit'
+import { EscapeMenu } from '../ui/escapeMenu'
 
 const BIOMES: PlanetBiome[] = ['gas_giant', 'rocky', 'ice', 'volcanic', 'oceanic', 'desert']
 
@@ -69,6 +70,9 @@ export class BattleScene extends Phaser.Scene {
   private fledByMe = false
   /** True while the first-battle tutorial paused the fight on its own. */
   private tutorialPaused = false
+  /** True while the escape menu paused the fight on its own. */
+  private menuPaused = false
+  private escapeMenu!: EscapeMenu
 
   private readonly onSnapshot = (snap: BattleSnapshot): void => {
     this.applySnapshot(snap)
@@ -234,9 +238,36 @@ export class BattleScene extends Phaser.Scene {
     this.crt = new CrtOverlay(this)
     this.crt.setEnabled(this.store.settings.crtEnabled)
 
+    // --- escape menu (pause + options + abandon) ---
+    const expedition = this.start.mode === 'expedition'
+    this.escapeMenu = new EscapeMenu(this, {
+      abandonLabel: expedition ? 'ABANDONAR' : 'RENDIRSE',
+      abandonConfirm: expedition
+        ? 'Te rindes en este combate y abandonas la expedición. Perderás todo el progreso, la chatarra y el botín.'
+        : 'Te rindes: perderás el duelo.',
+      onAbandon: () => {
+        if (!this.ended) this.net.socket.emit('battle:surrender')
+      },
+      crt: this.crt,
+      applyUiScaleLive: false, // uiScale is a menu-only zoom; never warp the battle HUD
+      onOpen: () => {
+        if (this.snap.pauseAllowed && !this.snap.paused) {
+          this.menuPaused = true
+          this.net.socket.emit('battle:pause', true)
+        }
+      },
+      onClose: () => {
+        if (this.menuPaused) {
+          this.menuPaused = false
+          if (!this.ended && this.snap.paused) this.net.socket.emit('battle:pause', false)
+        }
+      },
+    })
+
     // --- keyboard ---
     const kb = this.input.keyboard
     if (kb !== null) {
+      kb.on('keydown-ESC', () => this.escapeMenu.toggle())
       kb.on('keydown-SPACE', () => this.togglePause())
       kb.on('keydown-J', () => this.jumpClicked())
     }
@@ -256,7 +287,7 @@ export class BattleScene extends Phaser.Scene {
   // -------------------------------------------------------------------------
 
   private togglePause(): void {
-    if (this.ended) return
+    if (this.ended || this.escapeMenu.isOpen) return
     if (!this.snap.pauseAllowed) {
       Toast.show('Sin pausa en Duelo')
       return
@@ -265,7 +296,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private jumpClicked(): void {
-    if (this.ended) return
+    if (this.ended || this.escapeMenu.isOpen) return
     const jump = this.snap.you.jump
     if (jump.charging) {
       this.net.socket.emit('battle:jump', false)
@@ -393,6 +424,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    this.escapeMenu.destroy()
     this.targeting.destroy()
     this.tutorial.destroy()
     this.hud.destroy()
