@@ -231,6 +231,14 @@ export function installRouting(game: Phaser.Game): void {
   socket.on('run:state', (run) => {
     state.run = run
     const active = activeSceneKey(game)
+    // Resume on reconnect: a live run arriving while at the menu (or still
+    // booting) means the player closed the tab mid-expedition. Drop them back
+    // onto the sector map instead of stranding them with an invisible run that
+    // makes "start expedition" fail with "you already have one".
+    if ((active === 'MainMenu' || active === 'Boot') && run.alive && !state.snapshot) {
+      startScene(game, 'SectorMap')
+      return
+    }
     if (active === null || !RUN_ROUTED_SCENES.has(active)) return
     let target: SceneKey
     if (run.event !== null || run.eventResult !== null) target = 'Event'
