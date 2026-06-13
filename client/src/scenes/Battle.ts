@@ -144,8 +144,9 @@ export class BattleScene extends Phaser.Scene {
       maxCell: 52,
       onToggleDoor: (doorId) => {
         if (this.ended) return
+        const closing = this.snap.you.doors.find((d) => d.id === doorId)?.open === true
         this.net.socket.emit('battle:toggle_door', doorId)
-        audio.play('click')
+        audio.play('door', { detune: closing ? -140 : 140 })
       },
     })
     this.enemyView = new ShipView(this, HUD.enemyShipRect, this.snap.enemy, {

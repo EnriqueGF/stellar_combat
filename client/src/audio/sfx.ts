@@ -52,6 +52,8 @@ export function buildSfx(
       return victory(ctx, out, t0, df)
     case 'defeat':
       return defeat(ctx, out, t0, df)
+    case 'door':
+      return door(ctx, out, t0, df)
   }
 }
 
@@ -352,6 +354,32 @@ function victory(ctx: AudioContext, out: AudioNode, t0: number, df: number): num
     pluck(ctx, out, t0, { type: 'sine', freq: f * 2 * df, at, attack: 0.02, peak: 0.05, decay: 0.4 - at * 0.5 })
   })
   return 0.62
+}
+
+function door(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
+  // Soft pneumatic servo: a short band-passed air hiss plus a low mechanical
+  // thunk. Quiet (it fires often). Detune (open higher / close lower) varies it.
+  noiseBurst(ctx, out, t0, {
+    filterType: 'bandpass',
+    freq: 760 * df,
+    freqEnd: 340 * df,
+    glide: 0.1,
+    q: 1.5,
+    attack: 0.006,
+    peak: 0.13,
+    decay: 0.1,
+  })
+  pluck(ctx, out, t0, {
+    type: 'triangle',
+    freq: 190 * df,
+    freqEnd: 120 * df,
+    glide: 0.07,
+    at: 0.02,
+    attack: 0.004,
+    peak: 0.12,
+    decay: 0.08,
+  })
+  return 0.14
 }
 
 function defeat(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {

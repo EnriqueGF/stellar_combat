@@ -178,6 +178,7 @@ export type SfxName =
   | 'error'
   | 'victory'
   | 'defeat'
+  | 'door'
 
 export interface IAudioEngine {
   /** Safe to call before user gesture; queues resume. */

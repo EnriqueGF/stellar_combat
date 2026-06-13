@@ -118,7 +118,11 @@ export class ShipView {
   private readonly doorGfx: Phaser.GameObjects.Graphics
   private readonly doorZones: Phaser.GameObjects.Zone[] = []
   private readonly onToggleDoor?: (doorId: number) => void
-  private doorsSig = ''
+  /** Cached pixel placement per door id (rooms never move). */
+  private readonly doorGeo = new Map<number, { x: number; y: number; vertical: boolean; half: number }>()
+  /** Animated openness per door id: 0 = shut, 1 = fully slid open. */
+  private readonly doorFrac = new Map<number, number>()
+  private doorsAnimating = false
   private readonly hoverGfx: Phaser.GameObjects.Graphics
   private readonly glowGfx: Phaser.GameObjects.Graphics
   private readonly fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter
@@ -243,11 +247,13 @@ export class ShipView {
       this.roomZones.set(r.id, zone)
     }
 
-    // --- door hit zones (only on the controllable ship) ---
-    if (this.onToggleDoor) {
-      for (const door of initial.doors) {
-        const geo = this.doorGeometry(door)
-        if (geo === null) continue
+    // --- doors: cache geometry, seed openness, and (on your ship) add hit zones ---
+    for (const door of initial.doors) {
+      const geo = this.doorGeometry(door)
+      if (geo === null) continue
+      this.doorGeo.set(door.id, geo)
+      this.doorFrac.set(door.id, door.open ? 1 : 0)
+      if (this.onToggleDoor) {
         const id = door.id
         // Depth above room zones so a click on the wall toggles the door rather
         // than moving crew into the adjacent room.
@@ -265,6 +271,7 @@ export class ShipView {
         this.doorZones.push(zone)
       }
     }
+    this.redrawDoors()
 
     this.apply(initial)
   }
@@ -333,27 +340,38 @@ export class ShipView {
     }
   }
 
-  /** Draws every door: open = dim stubs with a gap; closed = solid amber bar. */
+  /**
+   * Draws every door as a framed doorway with two sliding leaves (FTL-style):
+   * the leaves meet in the middle when shut and retract into the jambs as the
+   * door opens. `doorFrac` (0 shut → 1 open) drives the slide.
+   */
   private redrawDoors(): void {
     const g = this.doorGfx
     g.clear()
-    for (const door of this.state.doors) {
-      const geo = this.doorGeometry(door)
-      if (geo === null) continue
+    for (const [id, geo] of this.doorGeo) {
       const { x, y, vertical, half } = geo
-      if (door.open) {
-        g.lineStyle(3, COLORS.textDim, 0.75)
-        if (vertical) {
-          g.lineBetween(x, y - half, x, y - half * 0.45)
-          g.lineBetween(x, y + half * 0.45, x, y + half)
-        } else {
-          g.lineBetween(x - half, y, x - half * 0.45, y)
-          g.lineBetween(x + half * 0.45, y, x + half, y)
-        }
+      const frac = this.doorFrac.get(id) ?? 1
+      const leaf = (1 - frac) * (half - 1) // length of each leaf from its jamb
+      const jamb = 3
+      // Door frame: a short tick at each jamb, perpendicular to the wall.
+      g.lineStyle(2, COLORS.textDim, 0.85)
+      if (vertical) {
+        g.lineBetween(x - jamb, y - half, x + jamb, y - half)
+        g.lineBetween(x - jamb, y + half, x + jamb, y + half)
       } else {
-        g.lineStyle(4, COLORS.warn, 1)
-        if (vertical) g.lineBetween(x, y - half, x, y + half)
-        else g.lineBetween(x - half, y, x + half, y)
+        g.lineBetween(x - half, y - jamb, x - half, y + jamb)
+        g.lineBetween(x + half, y - jamb, x + half, y + jamb)
+      }
+      // Door leaves sliding out of each jamb towards the centre.
+      if (leaf > 0.5) {
+        g.lineStyle(4, COLORS.shield, 0.95)
+        if (vertical) {
+          g.lineBetween(x, y - half, x, y - half + leaf)
+          g.lineBetween(x, y + half, x, y + half - leaf)
+        } else {
+          g.lineBetween(x - half, y, x - half + leaf, y)
+          g.lineBetween(x + half, y, x + half - leaf, y)
+        }
       }
     }
   }
@@ -535,10 +553,9 @@ export class ShipView {
       this.iconDirty = true
     }
 
-    const doorsSig = state.doors.map((d) => (d.open ? '1' : '0')).join('')
-    if (doorsSig !== this.doorsSig) {
-      this.doorsSig = doorsSig
-      this.redrawDoors()
+    // Animate any door whose target (open?1:0) no longer matches its slide.
+    for (const door of state.doors) {
+      if (this.doorFrac.get(door.id) !== (door.open ? 1 : 0)) this.doorsAnimating = true
     }
 
     this.syncCrew(state.crew)
@@ -558,8 +575,25 @@ export class ShipView {
       this.iconDirty = false
       this.redrawIcons()
     }
+    if (this.doorsAnimating) this.animateDoors(dtMs)
     this.updateCrewPositions(time, dtMs)
     this.emitEnvParticles(dtMs)
+  }
+
+  /** Slides each door towards its target openness (~0.16 s full travel). */
+  private animateDoors(dtMs: number): void {
+    const step = dtMs / 1000 / 0.16
+    let moving = false
+    for (const door of this.state.doors) {
+      const target = door.open ? 1 : 0
+      const cur = this.doorFrac.get(door.id) ?? target
+      if (cur === target) continue
+      const next = cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step)
+      this.doorFrac.set(door.id, next)
+      if (next !== target) moving = true
+    }
+    this.redrawDoors()
+    this.doorsAnimating = moving
   }
 
   private emitEnvParticles(dtMs: number): void {
