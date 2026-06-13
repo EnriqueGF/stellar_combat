@@ -152,8 +152,8 @@ export function fillHowTo(scene: Phaser.Scene, panel: Panel): void {
   const lines = [
     '· EXPEDICIÓN: recorre un sector de 8 columnas eligiendo nodos; combate,',
     '  comercia y mejora tu nave con chatarra hasta el jefe final.',
-    '· ENERGÍA: el reactor alimenta los sistemas. En batalla, haz clic en los',
-    '  pips de la barra inferior para asignar o retirar energía en vivo.',
+    '· ENERGÍA: el reactor alimenta los sistemas. En la barra inferior, clic',
+    '  izquierdo sobre un sistema añade 1 de energía; clic derecho la quita.',
     '· TRIPULACIÓN: 4 especialistas que reparan, apagan fuegos y potencian',
     '  sistemas. Clic en un tripulante y luego en una sala para moverlo.',
     '· HUIDA: carga el salto (cabina tripulada + motores) para escapar,',

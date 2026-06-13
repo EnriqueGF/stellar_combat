@@ -36,10 +36,11 @@ Tests y comprobación de tipos: `npm test` · `npm run typecheck`.
 | Tecla | Acción |
 |---|---|
 | `1–4` | seleccionar arma (luego click en una sala enemiga para apuntar) |
-| `ESC` / click derecho | cancelar selección / limpiar objetivo |
+| Click derecho | cancelar el arma/objetivo seleccionado |
+| `ESC` | menú (reanudar · opciones · cómo jugar · abandonar) |
 | `ESPACIO` | pausa táctica (solo contra la IA) |
 | `J` | cargar/cancelar el salto (huir pierde el botín del nodo) |
-| Click en pips | asignar energía a un sistema (click derecho la quita) |
+| Click en un sistema | click izq. +1 de energía · click dcho. −1 |
 | Click tripulante → sala | dar orden de movimiento |
 
 Regla de oro: **Energía funde escudos, Cinético perfora cascos, Explosivo revienta sistemas.**

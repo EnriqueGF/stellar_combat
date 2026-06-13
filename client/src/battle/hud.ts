@@ -1,8 +1,7 @@
 // Bottom HUD bar (GAME_SPEC §6.3 pixel budget): reactor pips, 7 clickable
 // system power columns, 4 weapon slots with radial cooldowns, global missile
-// counter, 3 drone slots and the jump button. Pips are the click target:
-// click pip N assigns up to N+1 (toggle-down on same level), right click or
-// wheel-down removes one.
+// counter, 3 drone slots and the jump button. Power is adjusted one step at a
+// time: left click on a system adds 1 energy, right click (or wheel) removes 1.
 
 import type Phaser from 'phaser'
 import {
@@ -151,7 +150,7 @@ export class BottomHud {
       .setDepth(DEPTH)
     Tooltip.attach(reactorZone, () => {
       const s = this.state
-      return `Reactor: ${s.sparePower} de ${s.reactor} de energía libre.\nHaz click en los pips de cada sistema para asignarla.`
+      return `Reactor: ${s.sparePower} de ${s.reactor} de energía libre.\nClick izq. en un sistema añade energía; click dcho. la quita.`
     })
     this.disposables.push(reactorZone)
 
@@ -170,14 +169,8 @@ export class BottomHud {
       zone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
         const sys = this.systemOf(sysId)
         if (sys === undefined) return
-        if (pointer.rightButtonDown()) {
-          this.adjustPower(sys, -1)
-          return
-        }
-        const i = clamp(Math.round((BAR_Y + 109 - pointer.y) / 8), 0, sys.level - 1)
-        const desired = sys.power === i + 1 ? i : i + 1
-        this.socket.emit('battle:set_power', sysId, desired)
-        this.audio.play('click')
+        // Simple model: left click adds 1 energy, right click removes 1.
+        this.adjustPower(sys, pointer.rightButtonDown() ? -1 : 1)
       })
       zone.on('wheel', (_p: Phaser.Input.Pointer, _dx: number, dy: number) => {
         const sys = this.systemOf(sysId)
@@ -442,7 +435,7 @@ export class BottomHud {
     }
     const dmg =
       sys.damage > 0.05 ? `\nDaño: ${sys.damage.toFixed(1)} (niveles útiles: ${usable})` : ''
-    return `${SYSTEM_NAMES[id]} — nivel ${sys.level}, energía ${sys.power}\n${effect}${dmg}\nClick en un pip: asignar · click dcho/rueda: quitar`
+    return `${SYSTEM_NAMES[id]} — nivel ${sys.level}, energía ${sys.power}\n${effect}${dmg}\nClick izq: +1 energía · click dcho/rueda: −1`
   }
 
   private slotTooltip(i: number): string {
