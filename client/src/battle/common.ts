@@ -2,7 +2,7 @@
 
 import Phaser from 'phaser'
 import type { CrewClassId, SystemId, WeaponCategory, WeaponId } from '@stellar/shared'
-import { COLORS_CSS, FONTS } from '../theme'
+import { COLORS_CSS, FONTS, TEXT_RESOLUTION } from '../theme'
 
 export interface Rect {
   x: number
@@ -106,6 +106,7 @@ export function makeText(
     fontFamily: FONTS.body,
     fontSize: `${size}px`,
     color,
+    resolution: TEXT_RESOLUTION,
     ...extra,
   })
 }
@@ -122,6 +123,7 @@ export function makeTitleText(
     fontFamily: FONTS.title,
     fontSize: `${size}px`,
     color,
+    resolution: TEXT_RESOLUTION,
   })
 }
 

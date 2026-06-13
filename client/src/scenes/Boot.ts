@@ -2,7 +2,7 @@
 // network session, then hands over to the main menu.
 
 import Phaser from 'phaser'
-import { COLORS } from '../theme'
+import { COLORS, applyRenderScale } from '../theme'
 import { GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Tooltip } from '../ui/tooltip'
 import { Toast } from '../ui/toast'
@@ -17,6 +17,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyRenderScale(this)
     Tooltip.init(this.game)
     Toast.init(this.game)
     getAudio().applySettings(getState().settings)

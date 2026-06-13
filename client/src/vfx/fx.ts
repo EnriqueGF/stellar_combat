@@ -5,7 +5,7 @@
 import Phaser from 'phaser'
 import { clamp, mulberry32 } from '@stellar/shared'
 import type { FxApi, ProjectileVisualKind } from '../contracts'
-import { COLORS, FONTS } from '../theme'
+import { COLORS, FONTS, TEXT_RESOLUTION } from '../theme'
 import { PixelBuffer, cssColor } from './helpers'
 
 const FX_DEPTH = 600
@@ -230,6 +230,7 @@ function getText(c: FxCtx): Phaser.GameObjects.Text {
       color: '#ffffff',
       stroke: '#0a0e1a',
       strokeThickness: 4,
+      resolution: TEXT_RESOLUTION,
     })
     txt.setOrigin(0.5).setDepth(TEXT_DEPTH)
   }

@@ -23,7 +23,7 @@ import type {
   WeaponCategory,
 } from '@stellar/shared'
 import { clamp } from '@stellar/shared'
-import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, catColor } from '../theme'
+import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TEXT_RESOLUTION, catColor } from '../theme'
 import type { ICrtOverlay, ISpaceBackdrop } from '../contracts'
 import { SpaceBackdrop } from '../vfx/backdrop'
 import { CrtOverlay } from '../vfx/crt'
@@ -32,8 +32,6 @@ import { getState } from '../state'
 export function css(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`
 }
-
-const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 2)
 
 export function textStyle(
   kind: 'title' | 'body',
@@ -277,11 +275,13 @@ export function menuChrome(
   return { crt, backdrop }
 }
 
-/** Applies settings.uiScale as a camera zoom centered on the design canvas. */
+/** Applies settings.uiScale as a camera zoom centered on the design canvas.
+ *  Zoom is multiplied by RENDER_SCALE so the 1280×720 world fills the
+ *  supersampled backing store (see theme.ts RENDER_SCALE). */
 export function applyUiScale(scene: Phaser.Scene, scale?: number): void {
   const s = clamp(scale ?? getState().settings.uiScale, 0.85, 1.15)
   const cam = scene.cameras.main
-  cam.setZoom(s)
+  cam.setZoom(s * RENDER_SCALE)
   cam.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
 }
 

@@ -28,7 +28,7 @@ import { getState } from '../state'
 import { SpaceBackdrop } from '../vfx/backdrop'
 import { ShieldBubble } from '../vfx/shield'
 import { CrtOverlay } from '../vfx/crt'
-import { COLORS, COLORS_CSS, GAME_HEIGHT, GAME_WIDTH, HUD } from '../theme'
+import { COLORS, COLORS_CSS, GAME_HEIGHT, GAME_WIDTH, HUD, applyRenderScale } from '../theme'
 import { SYSTEM_NAMES, makeText, makeTitleText } from '../battle/common'
 import { CombatLog } from '../battle/combatLog'
 import { BattleEventRouter } from '../battle/eventFx'
@@ -113,6 +113,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyRenderScale(this)
     this.net = getNet()
     this.store = getState()
     const audio = getAudio()

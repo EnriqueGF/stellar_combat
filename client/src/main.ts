@@ -5,7 +5,7 @@ import '@fontsource/orbitron/index.css'
 import '@fontsource/orbitron/700.css'
 import '@fontsource/share-tech-mono/index.css'
 import Phaser from 'phaser'
-import { COLORS_CSS, GAME_HEIGHT, GAME_WIDTH } from './theme'
+import { COLORS_CSS, GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE } from './theme'
 import { BootScene } from './scenes/Boot'
 import { MainMenuScene } from './scenes/MainMenu'
 import { LoadoutScene } from './scenes/Loadout'
@@ -31,8 +31,10 @@ async function boot(): Promise<void> {
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'app',
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
+    // Backing store renders at RENDER_SCALE× the 1280×720 design; each scene's
+    // camera is zoomed to match so coordinates stay 1280×720 (see theme.ts).
+    width: GAME_WIDTH * RENDER_SCALE,
+    height: GAME_HEIGHT * RENDER_SCALE,
     backgroundColor: COLORS_CSS.spaceDeep,
     disableContextMenu: true, // right-click is a game action (cancel/clear target)
     scale: {

@@ -44,6 +44,34 @@ export const FONTS = {
 export const GAME_WIDTH = 1280
 export const GAME_HEIGHT = 720
 
+/**
+ * Supersampling factor. The world is designed in 1280×720 units, but the canvas
+ * backing store renders at GAME_WIDTH×GAME_HEIGHT×RENDER_SCALE and every scene's
+ * camera is zoomed by RENDER_SCALE (see applyRenderScale / applyUiScale), so the
+ * logical coordinate system stays 1280×720 while pixels are drawn at 2–3× density.
+ * Scale.FIT then shrinks that high-res canvas to the window, which is what makes
+ * text and vector art crisp instead of an upscaled 1280×720 blur. Integer factor
+ * keyed to device pixel ratio × the FIT upscale, clamped to [2,3] for sanity and
+ * fill-rate. Falls back to 2 outside the browser (e.g. tests).
+ */
+export const RENDER_SCALE: number = (() => {
+  if (typeof window === 'undefined') return 2
+  const dpr = window.devicePixelRatio || 1
+  const fit = Math.max(1, window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT)
+  return Math.min(3, Math.max(2, Math.ceil(dpr * fit)))
+})()
+
+/** Text rasterization density. Matches RENDER_SCALE so glyphs are pixel-crisp
+ *  after the camera zoom and FIT downscale (a lower value would blur under zoom). */
+export const TEXT_RESOLUTION = RENDER_SCALE
+
+/** Zooms a scene's main camera so the 1280×720 world fills the supersampled
+ *  canvas. Call once in create() for scenes that don't go through menuChrome. */
+export function applyRenderScale(scene: import('phaser').Scene): void {
+  scene.cameras.main.setZoom(RENDER_SCALE)
+  scene.cameras.main.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+}
+
 /** GAME_SPEC §6.3 — fixed HUD zones for the Battle scene (pixels, 1280×720). */
 export const HUD = {
   logRect: { x: 340, y: 4, w: 600, h: 52 },
