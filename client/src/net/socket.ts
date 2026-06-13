@@ -164,7 +164,9 @@ function startScene(game: Phaser.Game, key: SceneKey, data?: object): void {
 
 function buildResultData(result: BattleResult, yourSide: Side): ResultSceneData {
   const state = getState()
-  const mode = state.mode ?? 'duel'
+  // The Result screen only distinguishes expedition vs duel; tutorial never gets
+  // here (it routes straight back to the menu).
+  const mode: 'expedition' | 'duel' = state.mode === 'expedition' ? 'expedition' : 'duel'
   let bossNode = false
   if (state.run) {
     const current = state.run.sector.nodes.find((n) => n.id === state.run?.currentNodeId)
@@ -222,9 +224,11 @@ export function installRouting(game: Phaser.Game): void {
     state.lastResult = result
     state.lastResultSide = yourSide
     sc.emit('battle:end', result, yourSide)
-    // The Battle scene owns the Battle -> Result transition while active.
+    // The Battle scene owns the post-battle transition while active. This is the
+    // fallback when battle:end arrives after Battle already stopped (edge case).
     if (!isActive(game, 'Battle') && !isActive(game, 'Result')) {
-      startScene(game, 'Result', buildResultData(result, yourSide))
+      if (state.mode === 'tutorial') startScene(game, 'MainMenu')
+      else startScene(game, 'Result', buildResultData(result, yourSide))
     }
   })
 

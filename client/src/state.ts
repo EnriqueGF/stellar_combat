@@ -5,7 +5,7 @@
 // Settings persist in localStorage under 'sc_settings'.
 
 import { clamp } from '@stellar/shared'
-import type { BattleResult, BattleSnapshot, LobbyState, RunStatePublic, Side } from '@stellar/shared'
+import type { BattleResult, BattleSnapshot, GameMode, LobbyState, RunStatePublic, Side } from '@stellar/shared'
 import type { GameSettings, GameStateStore } from './contracts'
 
 const SETTINGS_KEY = 'sc_settings'
@@ -71,7 +71,7 @@ class Store implements ClientState {
   settings: GameSettings = loadSettings()
   run: RunStatePublic | null = null
   snapshot: BattleSnapshot | null = null
-  mode: 'expedition' | 'duel' | null = null
+  mode: GameMode | null = null
 
   lastResult: BattleResult | null = null
   lastResultSide: Side | null = null

@@ -30,6 +30,8 @@ Tests y comprobación de tipos: `npm test` · `npm run typecheck`.
   nave: puedes perder la run.
 - **Duelo PvP** — 1v1 en tiempo real contra otro jugador (o una IA si no llega rival),
   con loadouts de presupuesto fijo de 8 puntos. Sin pausa; muerte súbita a los 5 min.
+- **Tutorial** — combate de práctica autocontenido contra el NPC introductorio, con el
+  tutorial guiado siempre activo y pausa táctica. Se puede repetir cuando quieras.
 
 ## Controles
 

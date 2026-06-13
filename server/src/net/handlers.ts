@@ -7,6 +7,7 @@
 import {
   AMBUSH_CHANCE_ON_RECONNECT,
   DUEL_SUDDEN_DEATH_SEC,
+  LOADOUT_PRESETS,
   NPC_TEMPLATES,
   PVP_QUEUE_NPC_OFFER_SEC,
   validateLoadout,
@@ -115,6 +116,26 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
         backdropSeed: randomSeed(),
       },
     )
+    startHost(host)
+    broadcastLobby()
+  }
+
+  /** One-off guided practice battle: fixed beginner loadout vs the intro NPC, no run. */
+  const startTutorial = (p: Player): void => {
+    const template = NPC_TEMPLATES[0]
+    const loadout = LOADOUT_PRESETS.sentinel[0]?.loadout
+    if (!template || !loadout) return
+    let host: BattleHost | null = null
+    host = new BattleHost(setupFromLoadout(loadout, p.name), setupFromNpc(template), { a: p, b: null }, {
+      ...hostConfigBase((): void => {
+        if (host) liveHosts.delete(host)
+        broadcastLobby()
+      }),
+      mode: 'tutorial',
+      pauseAllowed: true,
+      suddenDeathSec: null,
+      backdropSeed: randomSeed(),
+    })
     startHost(host)
     broadcastLobby()
   }
@@ -331,6 +352,14 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       const loadout = p.duelQueue.loadout
       dequeueDuel(p)
       startDuelVsNpc(p, loadout)
+    })
+
+    socket.on('tutorial:start', () => {
+      const p = player
+      if (!p) return sendError('bad_intent', 'Identifícate primero.')
+      if (p.battle) return sendError('bad_intent', 'Ya estás en combate.')
+      if (p.duelQueue) dequeueDuel(p)
+      startTutorial(p)
     })
 
     // --- Battle intents ------------------------------------------------------

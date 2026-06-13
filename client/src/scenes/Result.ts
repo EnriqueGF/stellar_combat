@@ -30,7 +30,8 @@ export class ResultScene extends Phaser.Scene {
     const state = getState()
     this.result = data.result ?? state.lastResult
     this.yourSide = data.yourSide ?? state.lastResultSide ?? 'a'
-    this.mode = data.mode ?? state.mode ?? 'duel'
+    // Result only distinguishes expedition vs duel; tutorial never reaches here.
+    this.mode = data.mode ?? (state.mode === 'expedition' ? 'expedition' : 'duel')
   }
 
   create(): void {

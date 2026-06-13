@@ -13,7 +13,9 @@ import type {
   WeaponId,
 } from './types.js'
 
-export type GameMode = 'expedition' | 'duel'
+// 'tutorial' is a one-off, self-contained practice battle vs the intro NPC, with
+// the guided tutorial always shown and tactical pause enabled (see GAME_SPEC §10.7).
+export type GameMode = 'expedition' | 'duel' | 'tutorial'
 
 export interface LobbyState {
   /** Connected players currently online (for menu display). */
@@ -63,6 +65,8 @@ export interface ClientToServerEvents {
   'queue:leave': () => void
   /** Accept fighting an NPC instead of waiting for a human (duel queue). */
   'queue:accept_npc': () => void
+  /** Start the guided practice battle (fixed beginner loadout vs the intro NPC). */
+  'tutorial:start': () => void
 
   'battle:set_power': (system: SystemId, value: number) => void
   'battle:set_target': (weaponSlot: number, roomId: number | null) => void

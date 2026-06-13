@@ -11,6 +11,7 @@ import type {
   BattleSnapshot,
   BattleStartMsg,
   ClientToServerEvents,
+  GameMode,
   PlanetBiome,
   RunStatePublic,
   ServerToClientEvents,
@@ -85,7 +86,7 @@ export interface GameStateStore {
   run: RunStatePublic | null
   /** Latest battle snapshot (Battle scene reads between socket pushes). */
   snapshot: BattleSnapshot | null
-  mode: 'expedition' | 'duel' | null
+  mode: GameMode | null
 }
 
 // ---------------------------------------------------------------------------

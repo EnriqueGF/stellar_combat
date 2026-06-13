@@ -89,13 +89,18 @@ export class BattleScene extends Phaser.Scene {
     this.ended = true
     // Let the final VFX (explosion chain / jump flash) play before the switch.
     this.time.delayedCall(1500, () => {
+      // The tutorial is practice: skip the Result screen and return to the menu.
+      if (this.start.mode === 'tutorial') {
+        this.scene.start('MainMenu')
+        return
+      }
       const run = this.store.run
       const node = run?.sector.nodes.find((n) => n.id === run.currentNodeId)
       const bossNode = node?.type === 'boss'
       const data: ResultSceneData = {
         result,
         yourSide,
-        mode: this.start.mode,
+        mode: this.start.mode === 'expedition' ? 'expedition' : 'duel',
         runContinues:
           this.start.mode === 'expedition' &&
           !bossNode &&
@@ -166,7 +171,9 @@ export class BattleScene extends Phaser.Scene {
         fleeTooltip:
           this.start.mode === 'expedition'
             ? 'Huir: pierdes el botín del nodo.\nRequiere cabina tripulada y motores con energía.'
-            : 'Huir: en Duelo cuenta como rendición.',
+            : this.start.mode === 'tutorial'
+              ? 'Huir: termina la práctica.\nRequiere cabina tripulada y motores con energía.'
+              : 'Huir: en Duelo cuenta como rendición.',
       },
       {
         onSelectWeapon: (slot) => this.targeting.selectWeapon(slot),
@@ -221,7 +228,11 @@ export class BattleScene extends Phaser.Scene {
         },
       },
     )
-    if (this.start.firstBattle && !this.store.settings.tutorialDone) {
+    // Tutorial mode always shows the guide; an expedition shows it only once.
+    const showTutorial =
+      this.start.mode === 'tutorial' ||
+      (this.start.firstBattle && !this.store.settings.tutorialDone)
+    if (showTutorial) {
       this.time.delayedCall(700, () => {
         if (this.ended) return
         // Auto-pause while the tutorial is on screen so the player can read it
@@ -239,12 +250,19 @@ export class BattleScene extends Phaser.Scene {
     this.crt.setEnabled(this.store.settings.crtEnabled)
 
     // --- escape menu (pause + options + abandon) ---
-    const expedition = this.start.mode === 'expedition'
+    const abandon =
+      this.start.mode === 'expedition'
+        ? {
+            label: 'ABANDONAR',
+            confirm:
+              'Te rindes en este combate y abandonas la expedición. Perderás todo el progreso, la chatarra y el botín.',
+          }
+        : this.start.mode === 'tutorial'
+          ? { label: 'SALIR', confirm: 'Saldrás del tutorial y volverás al menú principal.' }
+          : { label: 'RENDIRSE', confirm: 'Te rindes: perderás el duelo.' }
     this.escapeMenu = new EscapeMenu(this, {
-      abandonLabel: expedition ? 'ABANDONAR' : 'RENDIRSE',
-      abandonConfirm: expedition
-        ? 'Te rindes en este combate y abandonas la expedición. Perderás todo el progreso, la chatarra y el botín.'
-        : 'Te rindes: perderás el duelo.',
+      abandonLabel: abandon.label,
+      abandonConfirm: abandon.confirm,
       onAbandon: () => {
         if (!this.ended) this.net.socket.emit('battle:surrender')
       },

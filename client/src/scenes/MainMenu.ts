@@ -57,25 +57,28 @@ export class MainMenuScene extends Phaser.Scene {
     ).setOrigin(0.5)
 
     const bx = GAME_WIDTH / 2
-    let by = 320
-    const gap = 66
+    let by = 300
+    const gap = 60
+    const opts = { width: 320, height: 52 }
+    const ghost = { ...opts, variant: 'ghost' as const }
     new Button(this, bx, by, 'EXPEDICIÓN', () => {
       const data: LoadoutSceneData = { mode: 'expedition', timeoutSec: null }
       this.scene.start('Loadout', data)
-    }, { width: 320, height: 54 })
+    }, opts)
     by += gap
     new Button(this, bx, by, 'DUELO PVP', () => {
       const data: LoadoutSceneData = { mode: 'duel', timeoutSec: PVP_LOADOUT_TIMEOUT_SEC }
       this.scene.start('Loadout', data)
-    }, { width: 320, height: 54 })
+    }, opts)
     by += gap
-    new Button(this, bx, by, 'CÓMO JUGAR', () => {
-      this.openHowTo()
-    }, { width: 320, height: 54, variant: 'ghost' })
+    // Practice battle: the server starts it and battle:start routes us to Battle.
+    new Button(this, bx, by, 'TUTORIAL', () => {
+      getNet().socket.emit('tutorial:start')
+    }, ghost)
     by += gap
-    new Button(this, bx, by, 'OPCIONES', () => {
-      this.openOptions()
-    }, { width: 320, height: 54, variant: 'ghost' })
+    new Button(this, bx, by, 'CÓMO JUGAR', () => this.openHowTo(), ghost)
+    by += gap
+    new Button(this, bx, by, 'OPCIONES', () => this.openOptions(), ghost)
 
     this.onlineText = addText(this, 16, GAME_HEIGHT - 26, '', 'body', 14, COLORS.textDim)
     this.refreshOnline()

@@ -233,8 +233,17 @@ huir cuenta como rendición.
 
 ### 4.3 Pausa táctica
 
-Solo vs NPC (Expedición o Duelo-vs-NPC). `SPACE` pausa la simulación de esa batalla en el
-servidor; se puede apuntar, redistribuir energía y dar órdenes en pausa. Indicador claro "PAUSA".
+Solo vs NPC (Expedición, Duelo-vs-NPC o Tutorial). `SPACE` pausa la simulación de esa batalla
+en el servidor; se puede apuntar, redistribuir energía y dar órdenes en pausa. Indicador claro
+"PAUSA". El menú de escape (`ESC`) también auto-pausa mientras está abierto.
+
+### 4.4 Tutorial (práctica, ver §10.7)
+
+Combate planificado y autocontenido para aprender: loadout fijo de principiante (Centinela
+"Equilibrado") contra el NPC intro (columna 1, sin escudos), con pausa permitida y el tutorial
+guiado de 6 pasos **siempre** activo (independiente de `tutorialDone`). No forma parte de una
+run: al terminar (victoria, derrota o salir por el menú de escape) se vuelve al menú principal.
+Se lanza con el botón "Tutorial" del menú (intent `tutorial:start`).
 
 ## 5. Pantallas y flujo (GDD §3.1)
 
@@ -242,7 +251,7 @@ servidor; se puede apuntar, redistribuir energía y dar órdenes en pausa. Indic
 con `Mejora` / `Evento` / `Tienda` entre nodos en Expedición.
 
 1. **MainMenu**: título con planeta procedural de fondo; botones: Expedición, Duelo PvP,
-   Opciones (volúmenes, CRT on/off, escala UI), Cómo jugar.
+   Tutorial (combate de práctica, §4.4), Cómo jugar, Opciones (volúmenes, CRT on/off, escala UI).
 2. **Loadout**: elegir nave (cards con stats y layout), armas con presupuesto de 8 pts,
    módulo de defensa, drones, 4 tripulantes por clase. Botón "Listo".
 3. **SectorMap** (Expedición): grafo de nodos sobre fondo planetario; nodo actual brillante.
@@ -298,8 +307,8 @@ a menús):
 
 Desglose de la barra inferior (≈1270 px usables):
 **reactor** (70px, pips verticales de energía libre) · **7 sistemas** (40px/columna = 280px;
-los **pips son el target de click**: click en pip N asigna hasta N, click derecho o rueda
-abajo quita; pips con 3 estados visuales: asignado/lleno, disponible/hueco, dañado = ✕ roja)
+**click izquierdo sobre un sistema añade 1 de energía, click derecho o rueda abajo quita 1**;
+pips con 3 estados visuales: asignado/lleno, disponible/hueco, dañado = ✕ roja)
 · **armas** (4 × 105px = 420px: nombre corto, cooldown radial, nº de slot, icono de categoría
 con mini-triángulo de bonus, estados: sin energía = pips apagados + icono enchufe; sin
 munición = misil tachado; cargando = radial; lista = borde pulsante; autofire = Ⓐ)
@@ -311,7 +320,7 @@ incumplido: "Cabina sin piloto" / "Motores sin energía") · márgenes/separador
   color+icono de clase y barra HP; fuego/brecha/O2 con partículas y overlays.
 - Escudos: burbuja de **hexágonos** alrededor de la nave, ripple al impacto, capas visibles.
 - **Targeting**: seleccionar arma (click o tecla 1–4) → crosshair sobre la nave enemiga →
-  click en sala = fijar. **ESC o click derecho cancela la selección**; click derecho sobre
+  click en sala = fijar. **El click derecho cancela la selección**; click derecho sobre
   la sala objetivo (o sobre el slot) limpia el objetivo. Con un arma seleccionada, los
   clicks sobre la nave propia solo cancelan la selección (sin ambigüedad con tripulación).
   Las líneas de objetivo llevan **badge con el nº de slot (1–4)** y trazo distinto por
@@ -320,8 +329,8 @@ incumplido: "Cabina sin piloto" / "Motores sin energía") · márgenes/separador
 - Feedback: números de daño flotantes (suben alejándose del log), shake en impactos de casco,
   flash + icono de alerta de O2 y de cabina vacía (forma + texto, nunca solo color).
 - Accesibilidad: pausa táctica, tooltips en TODO (hover ≥300 ms) incluyendo el triángulo de
-  categorías en cada slot de arma, atajos (1–4 armas, SPACE pausa, J salto, ESC cancelar),
-  CRT/scanlines desactivable, sin información solo-por-color.
+  categorías en cada slot de arma, atajos (1–4 armas, SPACE pausa, J salto, ESC abre el menú de
+  escape: reanudar/opciones/cómo jugar/abandonar), CRT/scanlines desactivable, sin info solo-color.
 - Tutorial: primera batalla de Expedición (vs NPC intro sin escudos, ganable garantizado)
   con 6 pasos guiados (energía → apuntar → triángulo de categorías → escudos → tripulación
   → pausa), saltable, persistido en localStorage; pasos contextuales la primera vez que
@@ -383,3 +392,6 @@ Servidor→Cliente: `lobby:state`, `battle:start {estado inicial completo}`, `ba
 5. **Clase Técnico no implementada**: el propio GDD la marca "pendiente de implementar".
 6. **Presupuesto de armas**: puntos de selección = energía del arma en TODAS las armas,
    alineado con "8 puntos de energía" del GDD.
+7. **Tutorial como modo aparte (extensión)**: el GDD ata el tutorial a la primera batalla de
+   Expedición; además lo ofrecemos como combate de práctica independiente desde el menú (§4.4)
+   para poder repetirlo sin empezar una run. Reutiliza el mismo tutorial guiado y NPC intro.
