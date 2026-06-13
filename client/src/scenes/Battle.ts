@@ -67,6 +67,8 @@ export class BattleScene extends Phaser.Scene {
   private created = false
   private ended = false
   private fledByMe = false
+  /** True while the first-battle tutorial paused the fight on its own. */
+  private tutorialPaused = false
 
   private readonly onSnapshot = (snap: BattleSnapshot): void => {
     this.applySnapshot(snap)
@@ -207,12 +209,24 @@ export class BattleScene extends Phaser.Scene {
         onDone: () => {
           this.store.settings.tutorialDone = true
           this.store.saveSettings()
+          // Resume the fight the tutorial paused (unless the battle already ended).
+          if (this.tutorialPaused) {
+            this.tutorialPaused = false
+            if (!this.ended && this.snap.paused) this.net.socket.emit('battle:pause', false)
+          }
         },
       },
     )
     if (this.start.firstBattle && !this.store.settings.tutorialDone) {
       this.time.delayedCall(700, () => {
-        if (!this.ended) this.tutorial.start()
+        if (this.ended) return
+        // Auto-pause while the tutorial is on screen so the player can read it
+        // without taking fire (pause is allowed vs the NPC in Expedición).
+        if (this.snap.pauseAllowed && !this.snap.paused) {
+          this.tutorialPaused = true
+          this.net.socket.emit('battle:pause', true)
+        }
+        this.tutorial.start()
       })
     }
 
@@ -283,7 +297,9 @@ export class BattleScene extends Phaser.Scene {
     this.portraits.apply(snap.you.crew)
     this.readouts.apply(snap.you)
     this.targeting.refresh(snap.you)
-    this.pauseOverlay?.setVisible(snap.paused)
+    // While the tutorial is up the auto-pause is implied by its own dim overlay,
+    // so don't also show the PAUSA TÁCTICA banner (they'd overlap near the top).
+    this.pauseOverlay?.setVisible(snap.paused && !this.tutorial.active)
   }
 
   // -------------------------------------------------------------------------
