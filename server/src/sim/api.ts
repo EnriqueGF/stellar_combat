@@ -72,6 +72,7 @@ export interface IBattleSim {
   toggleAutofire(side: Side, weaponSlot: number): void
   moveCrew(side: Side, crewId: string, roomId: number): void
   toggleDrone(side: Side, droneSlot: number): void
+  toggleDoor(side: Side, doorId: number): void
   setJumpCharging(side: Side, charging: boolean): void
   surrender(side: Side): void
   /** Marks defeat for `side` with reason 'disconnect' (duel grace period expiry). */

@@ -263,6 +263,13 @@ export class BattleSim implements IBattleSim {
     recomputeShip(this.ctx.ships[side])
   }
 
+  toggleDoor(side: Side, doorId: number): void {
+    if (this.result !== null) return
+    const door = this.ctx.ships[side].doors[doorId]
+    if (!door) return
+    door.open = !door.open
+  }
+
   setJumpCharging(side: Side, charging: boolean): void {
     if (this.result !== null) return
     const ship = this.ctx.ships[side]
@@ -337,6 +344,7 @@ function toPublicShipState(ship: InternalShip): ShipState {
     sparePower: ship.sparePower,
     systems: ship.systems,
     rooms: ship.rooms,
+    doors: ship.doors,
     crew: ship.crew,
     weapons: ship.weapons,
     drones: ship.drones,

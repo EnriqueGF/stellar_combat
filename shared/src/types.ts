@@ -211,6 +211,16 @@ export interface RoomState {
   breach: number
 }
 
+/** A door between two rooms. Closed doors block O2 diffusion and fire spread, so
+ *  sealing a room off (all its doors closed) lets a fire suffocate it (FTL-style). */
+export interface DoorState {
+  /** Index into ShipLayout.doors; stable id used by battle:toggle_door. */
+  id: number
+  a: number
+  b: number
+  open: boolean
+}
+
 export interface CrewState {
   id: string
   name: string
@@ -266,6 +276,7 @@ export interface ShipState {
   sparePower: number
   systems: SystemState[]
   rooms: RoomState[]
+  doors: DoorState[]
   crew: CrewState[]
   weapons: WeaponSlotState[]
   drones: DroneSlotState[]

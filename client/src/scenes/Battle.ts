@@ -142,6 +142,11 @@ export class BattleScene extends Phaser.Scene {
     this.playerView = new ShipView(this, HUD.playerShipRect, this.snap.you, {
       facing: 1,
       maxCell: 52,
+      onToggleDoor: (doorId) => {
+        if (this.ended) return
+        this.net.socket.emit('battle:toggle_door', doorId)
+        audio.play('click')
+      },
     })
     this.enemyView = new ShipView(this, HUD.enemyShipRect, this.snap.enemy, {
       facing: -1,

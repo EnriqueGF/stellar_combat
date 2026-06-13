@@ -73,6 +73,8 @@ export interface ClientToServerEvents {
   'battle:toggle_autofire': (weaponSlot: number) => void
   'battle:move_crew': (crewId: string, roomId: number) => void
   'battle:toggle_drone': (droneSlot: number) => void
+  /** Open/close a door (by DoorState.id) to control O2 flow and fire spread. */
+  'battle:toggle_door': (doorId: number) => void
   'battle:jump': (charging: boolean) => void
   'battle:pause': (paused: boolean) => void
   'battle:surrender': () => void

@@ -43,6 +43,7 @@ Tests y comprobación de tipos: `npm test` · `npm run typecheck`.
 | `ESPACIO` | pausa táctica (solo contra la IA) |
 | `J` | cargar/cancelar el salto (huir pierde el botín del nodo) |
 | Click en un sistema | click izq. +1 de energía · click dcho. −1 |
+| Click en una compuerta | abrir/cerrar (cierra todas las de una sala para aislar O2 y asfixiar incendios) |
 | Click tripulante → sala | dar orden de movimiento |
 
 Regla de oro: **Energía funde escudos, Cinético perfora cascos, Explosivo revienta sistemas.**

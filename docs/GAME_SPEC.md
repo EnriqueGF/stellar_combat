@@ -145,11 +145,16 @@ Anti-personal, Escudo y Abordaje: **fase 2** (fuera del MVP, igual que en el GDD
 
 ### 3.5 Entorno y peligros (GDD §2.6)
 
-- **O2**: difusión entre salas conectadas por puertas (iguala niveles, tasa 4%/s por puerta).
-  Sistema de oxígeno alimentado rellena; sin energía, el O2 global decae 0.6%/s.
-  Tripulante en sala con O2<15% pierde 4 HP/s. Sala sin O2 sofoca el fuego.
+- **Compuertas (GDD/FTL)**: cada puerta del layout puede abrirse/cerrarse en vivo (estado
+  por nave en el snapshot; intent `battle:toggle_door`). Una puerta **cerrada** bloquea la
+  difusión de O2 y la propagación de fuego. **Aislar una sala** (cerrar TODAS sus puertas) la
+  corta del suministro: el oxígeno deja de rellenarla, así que un incendio consume el O2
+  restante y **se asfixia** (FTL); también contiene el fuego para que no salte a otras salas.
+- **O2**: difusión entre salas conectadas por **puerta abierta** (iguala niveles, 4%/s por
+  puerta). El oxígeno alimentado rellena toda sala no sellada; sin energía, el O2 global decae
+  0.6%/s. Tripulante en sala con O2<15% pierde 4 HP/s. Sala sin O2 sofoca el fuego.
 - **Fuego** (0–100 por sala): daña sistema 0.5/s y tripulantes 5 HP/s; consume O2 1.5%/s;
-  con O2<20% se extingue solo. Se propaga: cada 5 s, 20% a cada sala conectada.
+  con O2<20% se extingue solo. Se propaga cada 5 s a salas vecinas **por puertas abiertas**.
   Tripulante lo combate (−10/s, modificado por Soldado).
 - **Brecha** (0–100): drena O2 de la sala 3%/s; se repara por tripulante (−8/s).
   Mientras haya brecha el sistema de la sala no puede repararse.
@@ -318,6 +323,8 @@ incumplido: "Cabina sin piloto" / "Motores sin energía") · márgenes/separador
 
 - Salas: rects redondeados con icono del sistema; tripulantes = fichas circulares con
   color+icono de clase y barra HP; fuego/brecha/O2 con partículas y overlays.
+- **Compuertas**: se dibujan en el borde entre salas (en tu nave, **clicables**: abierta =
+  trazos tenues con hueco; cerrada = barra ámbar sólida). Click para abrir/cerrar y aislar O2/fuego.
 - Escudos: burbuja de **hexágonos** alrededor de la nave, ripple al impacto, capas visibles.
 - **Targeting**: seleccionar arma (click o tecla 1–4) → crosshair sobre la nave enemiga →
   click en sala = fijar. **El click derecho cancela la selección**; click derecho sobre

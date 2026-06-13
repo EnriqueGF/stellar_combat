@@ -399,6 +399,13 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       b.host.toggleDrone(b.side, droneSlot)
     })
 
+    socket.on('battle:toggle_door', (doorId) => {
+      const b = requireBattle()
+      if (!b) return
+      if (typeof doorId !== 'number') return
+      b.host.toggleDoor(b.side, doorId)
+    })
+
     socket.on('battle:jump', (charging) => {
       const b = requireBattle()
       if (!b) return

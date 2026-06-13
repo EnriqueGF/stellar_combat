@@ -26,16 +26,31 @@ const FIRE_SUFFOCATE_RATE = 50
 export function tickEnvironment(ctx: BattleCtx, side: Side, dt: number): void {
   const ship = ctx.ships[side]
 
-  // O2 refill / decay. Refill choice (documented): the powered oxygen system adds
-  // O2_REFILL_PER_LEVEL × power %/s uniformly to every room; unpowered, all rooms decay.
+  // O2 refill / decay. The powered oxygen system feeds the ship's air: every room
+  // NOT sealed off (≥1 open door) gains O2_REFILL_PER_LEVEL × power %/s. A sealed
+  // room (all its doors closed) is cut off from the air — that is what lets a fire
+  // suffocate it (FTL-style). With no oxygen power, the whole ship slowly decays.
   const oxygen = findSystem(ship, 'oxygen')
-  const o2Rate = oxygen && oxygen.power > 0 ? O2_REFILL_PER_LEVEL * oxygen.power : -O2_DECAY_NO_POWER
-  for (const room of ship.rooms) room.o2 += o2Rate * dt
+  const refillRate = oxygen && oxygen.power > 0 ? O2_REFILL_PER_LEVEL * oxygen.power : 0
+  const sealed = (roomId: number): boolean => {
+    let hasDoor = false
+    for (const d of ship.doors) {
+      if (d.a !== roomId && d.b !== roomId) continue
+      hasDoor = true
+      if (d.open) return false
+    }
+    return hasDoor
+  }
+  for (const room of ship.rooms) {
+    if (refillRate <= 0) room.o2 -= O2_DECAY_NO_POWER * dt
+    else if (!sealed(room.id)) room.o2 += refillRate * dt
+  }
 
-  // Diffusion: each door moves O2 from the high room to the low one.
-  for (const [r1, r2] of ship.layout.doors) {
-    const a = roomById(ship, r1)
-    const b = roomById(ship, r2)
+  // Diffusion: each OPEN door moves O2 from the high room to the low one.
+  for (const door of ship.doors) {
+    if (!door.open) continue
+    const a = roomById(ship, door.a)
+    const b = roomById(ship, door.b)
     if (!a || !b) continue
     const diff = a.o2 - b.o2
     const flow = O2_DIFFUSION_RATE * (Math.abs(diff) / 100) * dt
@@ -71,17 +86,23 @@ export function tickEnvironment(ctx: BattleCtx, side: Side, dt: number): void {
     if (room && room.o2 < O2_HYPOXIA_THRESHOLD) crew.hp -= O2_HYPOXIA_DPS * dt
   }
 
-  // Fire spread, evaluated on a fixed period per ship.
+  // Fire spread, evaluated on a fixed period per ship. Fire only jumps through
+  // OPEN doors, so closing a burning room's doors contains it (and starves it).
   ship.fireSpreadTimer += dt
   while (ship.fireSpreadTimer >= FIRE_SPREAD_PERIOD) {
     ship.fireSpreadTimer -= FIRE_SPREAD_PERIOD
-    const burning = ship.rooms.filter((r) => r.fire > 0).map((r) => r.id)
-    for (const roomId of burning) {
-      for (const adjId of ship.adj.get(roomId) ?? []) {
-        const target = roomById(ship, adjId)
-        if (!target || target.fire > 0) continue
-        if (ctx.rng() < FIRE_SPREAD_CHANCE) target.fire = FIRE_INTENSITY_ON_HIT
-      }
+    const ignite: number[] = []
+    for (const door of ship.doors) {
+      if (!door.open) continue
+      const a = roomById(ship, door.a)
+      const b = roomById(ship, door.b)
+      if (!a || !b) continue
+      if (a.fire > 0 && b.fire === 0 && ctx.rng() < FIRE_SPREAD_CHANCE) ignite.push(b.id)
+      if (b.fire > 0 && a.fire === 0 && ctx.rng() < FIRE_SPREAD_CHANCE) ignite.push(a.id)
+    }
+    for (const id of ignite) {
+      const target = roomById(ship, id)
+      if (target) target.fire = FIRE_INTENSITY_ON_HIT
     }
   }
 }

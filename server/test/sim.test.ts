@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   CREW_CLASSES,
+  FIRE_MIN_O2,
   LOADOUT_PRESETS,
   NPC_TEMPLATES,
   SHIELD_REGEN_DELAY_SEC,
@@ -208,6 +209,38 @@ test('O2 decays without powered oxygen, breaches drain rooms, hypoxia hurts crew
   const hpBefore = crew.hp
   runTicks(sim, 2 * TICK_RATE)
   assert.ok(crew.hp < hpBefore, 'crew suffocates below the hypoxia threshold')
+})
+
+test('closing a room\'s doors isolates its air: the fire suffocates and cannot spread', () => {
+  // Crew on systems (pilot->cockpit, gunner->weapons) so nobody roams to fight fire.
+  const sim = new BattleSim(
+    customSetup({ crew: [crewMember('pilot'), crewMember('gunner')] }),
+    customSetup({}),
+    OPTS,
+  )
+  const ship = sim.shipState('a') as InternalShip
+  const sealed = ship.rooms.find((r) => r.id === 6)
+  const neighbor = ship.rooms.find((r) => r.id === 2)
+  assert.ok(sealed && neighbor)
+
+  // Seal room 6 (close every door touching it) and light a fire with little air left.
+  for (const d of ship.doors) if (d.a === 6 || d.b === 6) d.open = false
+  sealed.fire = 80
+  sealed.o2 = 26
+  runTicks(sim, 6 * TICK_RATE)
+  assert.equal(sealed.fire, 0, 'a sealed room runs out of O2 and the fire dies')
+  assert.ok(sealed.o2 < FIRE_MIN_O2, 'the sealed room is cut off from the air supply')
+  assert.equal(neighbor.fire, 0, 'fire cannot spread through closed doors')
+
+  // Control: the same fire in an OPEN room (medbay, no crew) stays oxygenated by
+  // refill + diffusion, so it does NOT suffocate.
+  const open = ship.rooms.find((r) => r.id === 1)
+  assert.ok(open)
+  open.fire = 60
+  open.o2 = 30
+  ship.fireSpreadTimer = 0
+  runTicks(sim, 4 * TICK_RATE)
+  assert.ok(open.o2 > FIRE_MIN_O2, 'an open room keeps its air, so the fire survives')
 })
 
 test('flee: charges, pauses when the cockpit is vacated, completes with a fled result', () => {

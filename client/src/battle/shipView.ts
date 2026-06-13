@@ -10,6 +10,7 @@ import {
   clamp,
   mulberry32,
   type CrewState,
+  type DoorState,
   type RoomDef,
   type ShipClassId,
   type ShipState,
@@ -31,6 +32,7 @@ import {
   drawSystemIcon,
   drawTaskIcon,
 } from './icons'
+import { Tooltip } from '../ui/tooltip'
 
 const PARTICLE_KEY = 'bv_dot'
 const TOKEN_RADIUS = 8
@@ -83,6 +85,8 @@ export interface ShipViewOpts {
   facing: 1 | -1
   /** Cell size cap in px (~52 player, ~44 enemy). */
   maxCell: number
+  /** When set, this ship's doors become clickable; toggling one calls this. */
+  onToggleDoor?: (doorId: number) => void
 }
 
 export class ShipView {
@@ -111,6 +115,10 @@ export class ShipView {
   private readonly roomBase: Phaser.GameObjects.Graphics
   private readonly envGfx: Phaser.GameObjects.Graphics
   private readonly iconGfx: Phaser.GameObjects.Graphics
+  private readonly doorGfx: Phaser.GameObjects.Graphics
+  private readonly doorZones: Phaser.GameObjects.Zone[] = []
+  private readonly onToggleDoor?: (doorId: number) => void
+  private doorsSig = ''
   private readonly hoverGfx: Phaser.GameObjects.Graphics
   private readonly glowGfx: Phaser.GameObjects.Graphics
   private readonly fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter
@@ -129,6 +137,7 @@ export class ShipView {
   constructor(scene: Phaser.Scene, rect: Rect, initial: ShipState, opts: ShipViewOpts) {
     this.scene = scene
     this.facing = opts.facing
+    this.onToggleDoor = opts.onToggleDoor
     this.state = initial
 
     const def = SHIPS[initial.shipClass]
@@ -188,10 +197,12 @@ export class ShipView {
     this.roomBase = scene.add.graphics()
     this.envGfx = scene.add.graphics()
     this.iconGfx = scene.add.graphics()
+    this.doorGfx = scene.add.graphics()
     this.hoverGfx = scene.add.graphics()
     this.container.add(this.roomBase)
     this.container.add(this.envGfx)
     this.container.add(this.iconGfx)
+    this.container.add(this.doorGfx)
     this.container.add(this.hoverGfx)
     this.drawRoomBases()
 
@@ -232,6 +243,29 @@ export class ShipView {
       this.roomZones.set(r.id, zone)
     }
 
+    // --- door hit zones (only on the controllable ship) ---
+    if (this.onToggleDoor) {
+      for (const door of initial.doors) {
+        const geo = this.doorGeometry(door)
+        if (geo === null) continue
+        const id = door.id
+        // Depth above room zones so a click on the wall toggles the door rather
+        // than moving crew into the adjacent room.
+        const zone = scene.add
+          .zone(geo.x, geo.y, this.cell * 0.6, this.cell * 0.6)
+          .setInteractive()
+          .setDepth(40)
+        zone.on('pointerdown', () => this.onToggleDoor?.(id))
+        Tooltip.attach(
+          zone,
+          () =>
+            'Compuerta — click para abrir/cerrar.\nCierra todas las puertas de una sala para aislarla: ' +
+            'sin O2, un incendio se asfixia.',
+        )
+        this.doorZones.push(zone)
+      }
+    }
+
     this.apply(initial)
   }
 
@@ -262,6 +296,66 @@ export class ShipView {
     const rr = this.roomRect(roomId)
     if (rr === null) return this.center()
     return { x: rr.x + rr.w / 2, y: rr.y + rr.h / 2 }
+  }
+
+  /** Pixel placement of a door: midpoint of the shared wall + its orientation. */
+  private doorGeometry(
+    door: DoorState,
+  ): { x: number; y: number; vertical: boolean; half: number } | null {
+    const a = this.roomRect(door.a)
+    const b = this.roomRect(door.b)
+    if (a === null || b === null) return null
+    const T = 1.5
+    const ax2 = a.x + a.w
+    const ay2 = a.y + a.h
+    const bx2 = b.x + b.w
+    const by2 = b.y + b.h
+    const wallX = Math.abs(ax2 - b.x) < T ? ax2 : Math.abs(bx2 - a.x) < T ? b.x : null
+    if (wallX !== null) {
+      const y0 = Math.max(a.y, b.y)
+      const y1 = Math.min(ay2, by2)
+      return { x: wallX, y: (y0 + y1) / 2, vertical: true, half: Math.min(this.cell * 0.26, (y1 - y0) * 0.42) }
+    }
+    const wallY = Math.abs(ay2 - b.y) < T ? ay2 : Math.abs(by2 - a.y) < T ? b.y : null
+    if (wallY !== null) {
+      const x0 = Math.max(a.x, b.x)
+      const x1 = Math.min(ax2, bx2)
+      return { x: (x0 + x1) / 2, y: wallY, vertical: false, half: Math.min(this.cell * 0.26, (x1 - x0) * 0.42) }
+    }
+    // Non-adjacent door (rare): drop it midway between the two room centers.
+    const ca = this.roomCenter(door.a)
+    const cb = this.roomCenter(door.b)
+    return {
+      x: (ca.x + cb.x) / 2,
+      y: (ca.y + cb.y) / 2,
+      vertical: Math.abs(ca.x - cb.x) < Math.abs(ca.y - cb.y),
+      half: this.cell * 0.22,
+    }
+  }
+
+  /** Draws every door: open = dim stubs with a gap; closed = solid amber bar. */
+  private redrawDoors(): void {
+    const g = this.doorGfx
+    g.clear()
+    for (const door of this.state.doors) {
+      const geo = this.doorGeometry(door)
+      if (geo === null) continue
+      const { x, y, vertical, half } = geo
+      if (door.open) {
+        g.lineStyle(3, COLORS.textDim, 0.75)
+        if (vertical) {
+          g.lineBetween(x, y - half, x, y - half * 0.45)
+          g.lineBetween(x, y + half * 0.45, x, y + half)
+        } else {
+          g.lineBetween(x - half, y, x - half * 0.45, y)
+          g.lineBetween(x + half * 0.45, y, x + half, y)
+        }
+      } else {
+        g.lineStyle(4, COLORS.warn, 1)
+        if (vertical) g.lineBetween(x, y - half, x, y + half)
+        else g.lineBetween(x - half, y, x + half, y)
+      }
+    }
   }
 
   center(): Vec2 {
@@ -439,6 +533,12 @@ export class ShipView {
     if (sysKey !== this.systemsKey) {
       this.systemsKey = sysKey
       this.iconDirty = true
+    }
+
+    const doorsSig = state.doors.map((d) => (d.open ? '1' : '0')).join('')
+    if (doorsSig !== this.doorsSig) {
+      this.doorsSig = doorsSig
+      this.redrawDoors()
     }
 
     this.syncCrew(state.crew)
@@ -782,6 +882,8 @@ export class ShipView {
     this.destroyed = true
     for (const zone of this.roomZones.values()) zone.destroy()
     this.roomZones.clear()
+    for (const zone of this.doorZones) zone.destroy()
+    this.doorZones.length = 0
     for (const token of this.tokens.values()) token.container.destroy()
     this.tokens.clear()
     this.container.destroy(true)

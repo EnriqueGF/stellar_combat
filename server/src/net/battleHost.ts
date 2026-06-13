@@ -178,6 +178,10 @@ export class BattleHost {
     this.sim.toggleDrone(side, droneSlot)
   }
 
+  toggleDoor(side: Side, doorId: number): void {
+    this.sim.toggleDoor(side, doorId)
+  }
+
   setJumpCharging(side: Side, charging: boolean): void {
     this.sim.setJumpCharging(side, charging)
   }

@@ -351,6 +351,7 @@ export function buildInternalShip(setup: ShipSetup): InternalShip {
     sparePower: setup.reactor,
     systems,
     rooms: layout.rooms.map((r) => ({ id: r.id, o2: 100, fire: 0, breach: 0 })),
+    doors: layout.doors.map(([a, b], id) => ({ id, a, b, open: true })),
     crew: [],
     weapons: setup.weapons.map((weaponId) => ({
       weaponId,
