@@ -6,7 +6,7 @@ import Phaser from 'phaser'
 import { clamp, mulberry32 } from '@stellar/shared'
 import type { PlanetBiome } from '@stellar/shared'
 import type { ISpaceBackdrop } from '../contracts'
-import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
+import { BACKDROP_MARGIN_X, BACKDROP_MARGIN_Y, COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import {
   PixelBuffer,
   type Rgb,
@@ -121,6 +121,9 @@ export class SpaceBackdrop implements ISpaceBackdrop {
   private maskGfx: Phaser.GameObjects.Graphics | null = null
   private readonly rotSpeed: number
   private readonly twinkleDrift: number
+  /** Left edge and width of the covered world (stage + ultrawide margins). */
+  private readonly covOX: number
+  private readonly covW: number
   private destroyed = false
 
   constructor(
@@ -132,11 +135,17 @@ export class SpaceBackdrop implements ISpaceBackdrop {
     this.scene = scene
     const rng = mulberry32(seed)
     const style = BIOMES[biome]
-    // Logical design space (1280×720), NOT scene.scale.width — that is now the
-    // supersampled backing (2560×1440). The main camera zoom maps these to the
-    // full canvas; using the backing size would push the planet off-screen.
-    const W = GAME_WIDTH
-    const H = GAME_HEIGHT
+    // Cover the 1280×720 stage PLUS margins (in logical units, NOT the device
+    // backing size) so stars/nebula fill the screen on any aspect ratio. The
+    // camera centres the stage; this extra area is revealed around it on
+    // ultrawide/tall screens. Origin sits in negative space so the stage stays
+    // centred within the coverage.
+    const OX = -BACKDROP_MARGIN_X
+    const OY = -BACKDROP_MARGIN_Y
+    const W = GAME_WIDTH + BACKDROP_MARGIN_X * 2
+    const H = GAME_HEIGHT + BACKDROP_MARGIN_Y * 2
+    this.covOX = OX
+    this.covW = W
     const lw = Math.ceil(W / PIX)
     const lh = Math.ceil(H / PIX)
 
@@ -159,7 +168,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       buf.toTexture(scene, key)
       this.keys.push(key)
       const sprite = scene.add
-        .tileSprite(0, 0, lw, lh, key)
+        .tileSprite(OX, OY, lw, lh, key)
         .setOrigin(0)
         .setScale(PIX)
         .setDepth(-106 + li)
@@ -173,7 +182,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
     const twinkleCount = 10 + Math.floor(rng() * 5)
     for (let i = 0; i < twinkleCount; i++) {
       const img = scene.add
-        .image(rng() * W, rng() * H, WHITE_KEY)
+        .image(OX + rng() * W, OY + rng() * H, WHITE_KEY)
         .setScale(rng() < 0.3 ? PIX * 2 : PIX)
         .setTint(STAR_TINTS[Math.floor(rng() * STAR_TINTS.length)] ?? 0xffffff)
         .setDepth(-104) // with the front star layer, behind nebulae and planet
@@ -215,7 +224,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       buf.toTexture(scene, key)
       this.keys.push(key)
       const img = scene.add
-        .image(rng() * W, rng() * H, key)
+        .image(OX + rng() * W, OY + rng() * H, key)
         .setScale(PIX)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(-103)
@@ -226,8 +235,8 @@ export class SpaceBackdrop implements ISpaceBackdrop {
     // --- planet ---
     const screenR = (180 + rng() * 80) * (opts?.planetScale ?? 1)
     const rLow = Math.max(28, Math.round(screenR / PIX))
-    const px = opts?.planetX ?? W * 0.74
-    const py = opts?.planetY ?? H * 0.4
+    const px = opts?.planetX ?? GAME_WIDTH * 0.74
+    const py = opts?.planetY ?? GAME_HEIGHT * 0.4
     const planetKey = uniqueKey('bd_planet')
     paintPlanet(scene, planetKey, biome, rng, rLow)
     this.keys.push(planetKey)
@@ -272,11 +281,10 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       layer.sprite.tilePositionY += layer.dx * 0.18 * dt
     }
     if (this.detail) this.detail.tilePositionX += this.rotSpeed * dt
-    const W = GAME_WIDTH
     const drift = this.twinkleDrift * PIX * dt
     for (const star of this.twinkles) {
       star.x -= drift
-      if (star.x < -4) star.x += W + 8
+      if (star.x < this.covOX - 4) star.x += this.covW + 8
     }
   }
 

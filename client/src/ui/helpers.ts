@@ -23,7 +23,16 @@ import type {
   WeaponCategory,
 } from '@stellar/shared'
 import { clamp } from '@stellar/shared'
-import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TEXT_RESOLUTION, catColor } from '../theme'
+import {
+  COLORS,
+  FONTS,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  TEXT_RESOLUTION,
+  catColor,
+  fitCameraToStage,
+  installResponsiveCamera,
+} from '../theme'
 import type { ICrtOverlay, ISpaceBackdrop } from '../contracts'
 import { SpaceBackdrop } from '../vfx/backdrop'
 import { CrtOverlay } from '../vfx/crt'
@@ -267,7 +276,7 @@ export function menuChrome(
   }
   const crt = new CrtOverlay(scene)
   crt.setEnabled(settings.crtEnabled)
-  applyUiScale(scene)
+  installResponsiveCamera(scene, () => clamp(getState().settings.uiScale, 0.85, 1.15))
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
     backdrop?.destroy()
     crt.destroy()
@@ -275,14 +284,12 @@ export function menuChrome(
   return { crt, backdrop }
 }
 
-/** Applies settings.uiScale as a camera zoom centered on the design canvas.
- *  Zoom is multiplied by RENDER_SCALE so the 1280×720 world fills the
- *  supersampled backing store (see theme.ts RENDER_SCALE). */
+/** One-shot re-fit of the camera with a given uiScale (used for the live slider
+ *  preview in Options). The persistent resize listener is installed by
+ *  menuChrome → installResponsiveCamera. */
 export function applyUiScale(scene: Phaser.Scene, scale?: number): void {
   const s = clamp(scale ?? getState().settings.uiScale, 0.85, 1.15)
-  const cam = scene.cameras.main
-  cam.setZoom(s * RENDER_SCALE)
-  cam.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+  fitCameraToStage(scene, s)
 }
 
 export function formatDuration(sec: number): string {

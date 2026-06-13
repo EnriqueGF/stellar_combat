@@ -2,7 +2,7 @@
 // network session, then hands over to the main menu.
 
 import Phaser from 'phaser'
-import { COLORS, applyRenderScale } from '../theme'
+import { COLORS, installResponsiveCamera } from '../theme'
 import { GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { Tooltip } from '../ui/tooltip'
 import { Toast } from '../ui/toast'
@@ -17,7 +17,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    applyRenderScale(this)
+    installResponsiveCamera(this)
     Tooltip.init(this.game)
     Toast.init(this.game)
     getAudio().applySettings(getState().settings)
@@ -43,7 +43,15 @@ export class BootScene extends Phaser.Scene {
       .ready()
       .then(() => {
         installRouting(this.game)
-        if (this.scene.isActive('Boot')) this.scene.start('MainMenu')
+        // On a reconnect the server pushes run:state (or an ambush battle:start)
+        // right after the hello; the routing layer turns that into a scene start
+        // and stops Boot. We wait briefly for that, then fall back to MainMenu if
+        // nothing routed us. Doing it this way (rather than starting MainMenu
+        // immediately) means MainMenu is never started for a resuming player, so
+        // the menu and the sector map can't end up stacked on top of each other.
+        this.time.delayedCall(150, () => {
+          if (this.scene.isActive('Boot')) this.scene.start('MainMenu')
+        })
       })
   }
 }

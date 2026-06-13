@@ -44,32 +44,60 @@ export const FONTS = {
 export const GAME_WIDTH = 1280
 export const GAME_HEIGHT = 720
 
-/**
- * Supersampling factor. The world is designed in 1280×720 units, but the canvas
- * backing store renders at GAME_WIDTH×GAME_HEIGHT×RENDER_SCALE and every scene's
- * camera is zoomed by RENDER_SCALE (see applyRenderScale / applyUiScale), so the
- * logical coordinate system stays 1280×720 while pixels are drawn at 2–3× density.
- * Scale.FIT then shrinks that high-res canvas to the window, which is what makes
- * text and vector art crisp instead of an upscaled 1280×720 blur. Integer factor
- * keyed to device pixel ratio × the FIT upscale, clamped to [2,3] for sanity and
- * fill-rate. Falls back to 2 outside the browser (e.g. tests).
- */
-export const RENDER_SCALE: number = (() => {
+// ---------------------------------------------------------------------------
+// Responsive scaling (all resolutions + ultrawide).
+//
+// The canvas fills the whole window at native device resolution (see main.ts),
+// so there are NO letterbox bars on any aspect ratio. Gameplay is laid out in a
+// fixed 1280×720 "stage"; each scene's camera is zoomed by fitCameraToStage so
+// that stage is fully visible and centered. On non-16:9 screens the camera then
+// reveals extra world around the stage — filled by the backdrop, which is built
+// large enough (stage + the margins below) to cover it. Net effect: the HUD/ship
+// layout never distorts, ultrawide shows more space on the sides, and rendering
+// is pixel-native (no upscale blur).
+// ---------------------------------------------------------------------------
+
+/** How far (world units) the backdrop extends beyond the 1280×720 stage on each
+ *  axis, so stars/nebula/planet fill the screen on wide/tall aspects. X covers
+ *  up to ~32:9, Y up to ~1:1. */
+export const BACKDROP_MARGIN_X = 900
+export const BACKDROP_MARGIN_Y = 400
+
+/** Text rasterization density: must be ≥ the camera zoom (≈ device px ÷ 720) so
+ *  glyphs stay crisp under the zoom. Clamped [2,3]; falls back to 2 in tests. */
+export const TEXT_RESOLUTION: number = (() => {
   if (typeof window === 'undefined') return 2
   const dpr = window.devicePixelRatio || 1
-  const fit = Math.max(1, window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT)
-  return Math.min(3, Math.max(2, Math.ceil(dpr * fit)))
+  const fit = Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT)
+  return Math.min(3, Math.max(2, Math.ceil(dpr * Math.max(1, fit))))
 })()
 
-/** Text rasterization density. Matches RENDER_SCALE so glyphs are pixel-crisp
- *  after the camera zoom and FIT downscale (a lower value would blur under zoom). */
-export const TEXT_RESOLUTION = RENDER_SCALE
+/** Zooms/centres a scene's main camera so the 1280×720 stage fits the current
+ *  canvas (centered, fully visible). extraZoom layers the menu uiScale on top. */
+export function fitCameraToStage(scene: import('phaser').Scene, extraZoom = 1): void {
+  const w = scene.scale.gameSize.width
+  const h = scene.scale.gameSize.height
+  const cam = scene.cameras.main
+  cam.setSize(w, h)
+  cam.setZoom(Math.min(w / GAME_WIDTH, h / GAME_HEIGHT) * extraZoom)
+  cam.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+}
 
-/** Zooms a scene's main camera so the 1280×720 world fills the supersampled
- *  canvas. Call once in create() for scenes that don't go through menuChrome. */
-export function applyRenderScale(scene: import('phaser').Scene): void {
-  scene.cameras.main.setZoom(RENDER_SCALE)
-  scene.cameras.main.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+/** Fits the camera now and re-fits whenever the canvas resizes; auto-cleans on
+ *  scene shutdown/destroy. extraZoom is read fresh on each resize (so the menu
+ *  uiScale stays applied). */
+export function installResponsiveCamera(
+  scene: import('phaser').Scene,
+  extraZoom: () => number = () => 1,
+): void {
+  const refit = (): void => fitCameraToStage(scene, extraZoom())
+  refit()
+  scene.scale.on('resize', refit)
+  const off = (): void => {
+    scene.scale.off('resize', refit)
+  }
+  scene.events.once('shutdown', off)
+  scene.events.once('destroy', off)
 }
 
 /** GAME_SPEC §6.3 — fixed HUD zones for the Battle scene (pixels, 1280×720). */
