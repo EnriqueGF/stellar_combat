@@ -64,12 +64,19 @@ async function boot(): Promise<void> {
     const w = Math.max(1, Math.floor(window.innerWidth))
     const h = Math.max(1, Math.floor(window.innerHeight))
     const r = dpr()
-    game.scale.resize(Math.floor(w * r), Math.floor(h * r))
+    game.scale.resize(w * r, h * r)
     const canvas = game.canvas
     if (canvas) {
+      // resize() sets the CSS size to the backing size in NONE mode; force it
+      // back to display pixels so the canvas fills the window at 1:1 CSS.
       canvas.style.width = `${w}px`
       canvas.style.height = `${h}px`
     }
+    // CRITICAL: recompute the DOM→canvas input transform (canvasBounds +
+    // displayScale) from the FINAL css size. Without this, after a window resize
+    // Phaser keeps mapping the mouse against the previous size and clicks land in
+    // the wrong place.
+    game.scale.refresh()
   }
   resizeToWindow()
   window.addEventListener('resize', resizeToWindow)
