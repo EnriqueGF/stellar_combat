@@ -133,11 +133,19 @@ export class EscapeMenu {
       }),
     )
     const cy = (GAME_HEIGHT + h) / 2 - 40
-    this.addButton(m, GAME_WIDTH / 2 - 110, cy, this.opts.abandonLabel, 'danger', () => {
-      this.opts.onAbandon()
-      this.close()
-    })
-    this.addButton(m, GAME_WIDTH / 2 + 110, cy, 'CANCELAR', 'ghost', () => this.closeChild())
+    this.addButton(
+      m,
+      GAME_WIDTH / 2 - 116,
+      cy,
+      this.opts.abandonLabel,
+      'danger',
+      () => {
+        this.opts.onAbandon()
+        this.close()
+      },
+      196,
+    )
+    this.addButton(m, GAME_WIDTH / 2 + 116, cy, 'CANCELAR', 'ghost', () => this.closeChild(), 196)
     this.child = m
   }
 
@@ -155,8 +163,9 @@ export class EscapeMenu {
     label: string,
     variant: 'primary' | 'ghost' | 'danger',
     onClick: () => void,
+    width = 240,
   ): void {
-    const btn = new Button(this.scene, x, y, label, onClick, { width: 240, height: 46, variant })
+    const btn = new Button(this.scene, x, y, label, onClick, { width, height: 46, variant })
     m.container.add(btn)
   }
 }
