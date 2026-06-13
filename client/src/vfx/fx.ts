@@ -5,7 +5,7 @@
 import Phaser from 'phaser'
 import { clamp, mulberry32 } from '@stellar/shared'
 import type { FxApi, ProjectileVisualKind } from '../contracts'
-import { COLORS, FONTS, TEXT_RESOLUTION } from '../theme'
+import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, TEXT_RESOLUTION } from '../theme'
 import { PixelBuffer, cssColor } from './helpers'
 
 const FX_DEPTH = 600
@@ -170,8 +170,8 @@ function ctx(scene: Phaser.Scene): FxCtx {
   })
   smoke.setDepth(FX_DEPTH - 2)
 
-  const W = scene.scale.width
-  const H = scene.scale.height
+  const W = GAME_WIDTH
+  const H = GAME_HEIGHT
   const t = 22
   const edge = scene.add.container(0, 0, [
     scene.add.rectangle(0, 0, t, H, COLORS.danger).setOrigin(0),
@@ -179,7 +179,7 @@ function ctx(scene: Phaser.Scene): FxCtx {
     scene.add.rectangle(t, 0, W - 2 * t, t, COLORS.danger).setOrigin(0),
     scene.add.rectangle(t, H - t, W - 2 * t, t, COLORS.danger).setOrigin(0),
   ])
-  edge.setDepth(EDGE_DEPTH).setScrollFactor(0).setAlpha(0)
+  edge.setDepth(EDGE_DEPTH).setScrollFactor(1).setAlpha(0)
 
   const c: FxCtx = {
     scene,

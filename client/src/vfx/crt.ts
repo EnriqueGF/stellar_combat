@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser'
 import type { ICrtOverlay } from '../contracts'
+import { GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import { PixelBuffer } from './helpers'
 
 const CRT_DEPTH = 10000
@@ -26,18 +27,19 @@ export class CrtOverlay implements ICrtOverlay {
   private destroyed = false
 
   constructor(scene: Phaser.Scene) {
-    const W = scene.scale.width
-    const H = scene.scale.height
+    // Logical design space; the camera zoom maps it to the supersampled canvas.
+    const W = GAME_WIDTH
+    const H = GAME_HEIGHT
     ensureScanlineTexture(scene)
 
     const scanlines = scene.add
       .tileSprite(0, 0, W, H, SCANLINE_KEY)
       .setOrigin(0)
       .setDepth(CRT_DEPTH)
-      .setScrollFactor(0)
+      .setScrollFactor(1)
 
     // Radial vignette as concentric alpha rings (no gradients needed).
-    const vignette = scene.add.graphics().setDepth(CRT_DEPTH).setScrollFactor(0)
+    const vignette = scene.add.graphics().setDepth(CRT_DEPTH).setScrollFactor(1)
     for (let k = 0; k < 12; k++) {
       const a = 0.018 + (k / 11) ** 2 * 0.13
       vignette.lineStyle(40, 0x000000, a)
@@ -48,12 +50,12 @@ export class CrtOverlay implements ICrtOverlay {
       .rectangle(0, 0, 6, H, 0xff5c57, 0.05)
       .setOrigin(0)
       .setDepth(CRT_DEPTH)
-      .setScrollFactor(0)
+      .setScrollFactor(1)
     const right = scene.add
       .rectangle(W - 6, 0, 6, H, 0x2de2e6, 0.05)
       .setOrigin(0)
       .setDepth(CRT_DEPTH)
-      .setScrollFactor(0)
+      .setScrollFactor(1)
 
     this.objs.push(scanlines, vignette, left, right)
 

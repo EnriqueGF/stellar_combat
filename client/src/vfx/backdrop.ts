@@ -6,7 +6,7 @@ import Phaser from 'phaser'
 import { clamp, mulberry32 } from '@stellar/shared'
 import type { PlanetBiome } from '@stellar/shared'
 import type { ISpaceBackdrop } from '../contracts'
-import { COLORS } from '../theme'
+import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import {
   PixelBuffer,
   type Rgb,
@@ -132,8 +132,11 @@ export class SpaceBackdrop implements ISpaceBackdrop {
     this.scene = scene
     const rng = mulberry32(seed)
     const style = BIOMES[biome]
-    const W = scene.scale.width
-    const H = scene.scale.height
+    // Logical design space (1280×720), NOT scene.scale.width — that is now the
+    // supersampled backing (2560×1440). The main camera zoom maps these to the
+    // full canvas; using the backing size would push the planet off-screen.
+    const W = GAME_WIDTH
+    const H = GAME_HEIGHT
     const lw = Math.ceil(W / PIX)
     const lh = Math.ceil(H / PIX)
 
@@ -160,7 +163,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
         .setOrigin(0)
         .setScale(PIX)
         .setDepth(-106 + li)
-        .setScrollFactor(0)
+        .setScrollFactor(1)
       this.layers.push({ sprite, dx: spec.driftX })
     })
     this.twinkleDrift = STAR_LAYERS[2]?.driftX ?? 1
@@ -174,7 +177,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
         .setScale(rng() < 0.3 ? PIX * 2 : PIX)
         .setTint(STAR_TINTS[Math.floor(rng() * STAR_TINTS.length)] ?? 0xffffff)
         .setDepth(-104) // with the front star layer, behind nebulae and planet
-        .setScrollFactor(0)
+        .setScrollFactor(1)
         .setAlpha(0.3 + rng() * 0.5)
       scene.tweens.add({
         targets: img,
@@ -216,7 +219,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
         .setScale(PIX)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(-103)
-        .setScrollFactor(0)
+        .setScrollFactor(1)
       this.nebulae.push(img)
     }
 
@@ -232,7 +235,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       .image(px, py, planetKey)
       .setScale(PIX)
       .setDepth(-102)
-      .setScrollFactor(0)
+      .setScrollFactor(1)
 
     // --- fake rotation: drifting sparse-detail overlay masked to the disc ---
     const detKey = uniqueKey('bd_detail')
@@ -253,7 +256,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       .setScale(PIX)
       .setAlpha(0.16)
       .setDepth(-101)
-      .setScrollFactor(0)
+      .setScrollFactor(1)
     this.maskGfx = scene.add.graphics().setVisible(false)
     this.maskGfx.fillStyle(0xffffff)
     this.maskGfx.fillCircle(px, py, rLow * PIX * 0.96)
@@ -269,7 +272,7 @@ export class SpaceBackdrop implements ISpaceBackdrop {
       layer.sprite.tilePositionY += layer.dx * 0.18 * dt
     }
     if (this.detail) this.detail.tilePositionX += this.rotSpeed * dt
-    const W = this.scene.scale.width
+    const W = GAME_WIDTH
     const drift = this.twinkleDrift * PIX * dt
     for (const star of this.twinkles) {
       star.x -= drift
