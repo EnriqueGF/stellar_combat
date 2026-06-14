@@ -64,6 +64,7 @@ export class BattleHost {
       seed: config.seed,
       pauseAllowed: config.pauseAllowed,
       suddenDeathSec: config.suddenDeathSec,
+      beacon: config.mode === 'beacon',
     })
     this.sim = sim
     this.seats = { a: this.makeSeat('a', players.a), b: this.makeSeat('b', players.b) }
@@ -71,7 +72,9 @@ export class BattleHost {
   }
 
   private makeSeat(side: Side, player: Player | null): Seat {
-    return { player, npc: player ? null : new NpcController(this.sim, side), graceTimer: null }
+    // A beacon has no enemy: the empty seat gets no NPC brain so it just sits inert.
+    const npc = player || this.config.mode === 'beacon' ? null : new NpcController(this.sim, side)
+    return { player, npc, graceTimer: null }
   }
 
   /** Binds players, emits battle:start to connected seats and starts the tick loop. */
@@ -214,6 +217,9 @@ export class BattleHost {
 
   onDisconnect(side: Side): void {
     if (this.ended) return
+    // A beacon is a safe stop: no forfeit, no autopilot — it idles (crew keep
+    // repairing) until the player reconnects and rebinds.
+    if (this.config.mode === 'beacon') return
     const seat = this.seats[side]
     if (this.config.mode === 'expedition') {
       // The NPC brain autopilots the absent player's ship; a frozen pause would

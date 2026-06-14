@@ -15,7 +15,9 @@ import type {
 
 // 'tutorial' is a one-off, self-contained practice battle vs the intro NPC, with
 // the guided tutorial always shown and tactical pause enabled (see GAME_SPEC §10.7).
-export type GameMode = 'expedition' | 'duel' | 'tutorial'
+// 'beacon' is the FTL-style safe stop between nodes: the ship alone (no enemy),
+// real-time so crew repair/heal and the jump drive charges; jumping opens the map.
+export type GameMode = 'expedition' | 'duel' | 'tutorial' | 'beacon'
 
 export interface LobbyState {
   /** Connected players currently online (for menu display). */

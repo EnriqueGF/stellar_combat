@@ -354,7 +354,7 @@ export class RunManager {
     if (outcome.ammo) this.ammo = clamp(this.ammo + outcome.ammo, 0, MAX_AMMO)
     if (outcome.weaponReward) {
       this.lootWeapon = this.randomWeapon()
-      text += ` (${WEAPONS[this.lootWeapon].name} disponible gratis en la pantalla de mejora.)`
+      text += ` (${WEAPONS[this.lootWeapon].name} disponible gratis para instalar en la baliza.)`
     }
     if (outcome.crewDamage) {
       const living = this.crew.filter((c) => c.hp > 0)
@@ -507,9 +507,17 @@ export class RunManager {
     this.eventResult = null
     this.eventDelta = null
     this.shopOffers = null
-    this.lootWeapon = null
     this.pendingBattle = null
     this.combatChoices = null
+    // NOTE: lootWeapon is kept so it survives to the beacon, where it can be
+    // installed; settle() discards it when the player jumps away.
+  }
+
+  /** Called when the player jumps away from a beacon: clears the node state and
+   *  discards any reward they didn't take (uninstalled loot weapon). */
+  settle(): void {
+    this.continueRun()
+    this.lootWeapon = null
   }
 
   publicState(): RunStatePublic {

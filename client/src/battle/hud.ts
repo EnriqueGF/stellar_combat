@@ -32,13 +32,14 @@ import {
 import {
   drawCategoryIcon,
   drawCrossOut,
+  drawDroneIcon,
   drawMissileIcon,
   drawPlugCrossed,
   drawSystemIcon,
-  drawTaskIcon,
   drawTriangleBadge,
 } from './icons'
 import { ProgressBar, Tooltip, type IProgressBar } from './uiKit'
+import { Button } from '../ui/button'
 
 const BAR_Y = HUD.bottomBar.y
 const DEPTH = 14
@@ -52,10 +53,21 @@ const SLOT_W = 90
 const SLOT_INNER_W = 84
 const SLOT_H = 92
 const DRONE_X = 686
-const DRONE_STEP = 52
+const DRONE_W = 48
+const DRONE_H = 86
+const DRONE_STEP = 54
 const HELP_X = 852
-const JUMP_X = 930
+
+/** Short role label per drone kind (compact HUD card). */
+const DRONE_ROLE = { offensive: 'COMBATE', defensive: 'DEFENSA', internal: 'REPARA' } as const
+
+// Jump button: lifted out of the bottom bar to the top-left, right of the
+// vital-stats panel (HUD.readoutsRect ends at x≈191) so it reads as a flight
+// control next to hull/O2 rather than getting lost among the weapon cards.
+const JUMP_X = 196
+const JUMP_Y = 6
 const JUMP_W = 130
+const JUMP_H = 118
 
 export interface HudCallbacks {
   onSelectWeapon(slot: number): void
@@ -87,6 +99,8 @@ interface SlotWidget {
 
 interface DroneWidget {
   gfx: Phaser.GameObjects.Graphics
+  role: Phaser.GameObjects.Text
+  status: Phaser.GameObjects.Text
   zone: Phaser.GameObjects.Zone
   lastKey: string
 }
@@ -96,6 +110,8 @@ export class BottomHud {
   private readonly socket: TypedSocket
   private readonly audio: IAudioEngine
   private readonly cb: HudCallbacks
+  /** Beacon mode: the jump button reads "go to map" rather than "flee combat". */
+  private readonly beacon: boolean
   private state: ShipState
   private selectedSlot: number | null = null
   private ammoNotified = false
@@ -108,6 +124,8 @@ export class BottomHud {
   private readonly jumpTitle: Phaser.GameObjects.Text
   private readonly jumpReason: Phaser.GameObjects.Text
   private readonly jumpBar: IProgressBar
+  /** Amber "SALTAR" action button, shown when the jump is ready and unblocked. */
+  private readonly jumpBtn: Button
   private readonly disposables: { destroy(): void }[] = []
 
   private reactorKey = ''
@@ -118,13 +136,14 @@ export class BottomHud {
   constructor(
     scene: Phaser.Scene,
     initial: ShipState,
-    deps: { socket: TypedSocket; audio: IAudioEngine; fleeTooltip: string },
+    deps: { socket: TypedSocket; audio: IAudioEngine; fleeTooltip: string; beacon?: boolean },
     cb: HudCallbacks,
   ) {
     this.scene = scene
     this.socket = deps.socket
     this.audio = deps.audio
     this.cb = cb
+    this.beacon = deps.beacon ?? false
     this.state = initial
 
     // No bottom bar / dividers: the controls float "al aire" over the backdrop
@@ -188,12 +207,29 @@ export class BottomHud {
 
     // (Missile count now lives in the top-left vital-stats panel; see Readouts.)
 
-    // --- drones ---
+    // Group headers above the weapon and drone cards.
+    const groupLabel = (cx: number, text: string): void => {
+      const t = makeText(scene, cx, BAR_Y - 2, text, 9, COLORS_CSS.textDim, { fontStyle: 'bold' })
+        .setOrigin(0.5, 1)
+        .setDepth(DEPTH)
+      this.disposables.push(t)
+    }
+    groupLabel(WEAP_X + 3 + (4 * SLOT_W - SLOT_W + SLOT_INNER_W) / 2, 'ARMAS')
+    groupLabel(DRONE_X + (2 * DRONE_STEP + DRONE_W) / 2, 'DRONES')
+
+    // --- drones (compact weapon-style cards) ---
     for (let i = 0; i < 3; i++) {
-      const gfx = scene.add.graphics().setDepth(DEPTH)
       const x = DRONE_X + i * DRONE_STEP
+      const cx = x + DRONE_W / 2
+      const gfx = scene.add.graphics().setDepth(DEPTH)
+      const role = makeText(scene, cx, BAR_Y + 46, '', 8, COLORS_CSS.textDim, { align: 'center' })
+        .setOrigin(0.5)
+        .setDepth(DEPTH)
+      const status = makeText(scene, cx, BAR_Y + 64, '', 8, COLORS_CSS.textDim, { align: 'center' })
+        .setOrigin(0.5)
+        .setDepth(DEPTH)
       const zone = scene.add
-        .zone(x + 27, BAR_Y + 67, 54, 110)
+        .zone(cx, BAR_Y + 6 + DRONE_H / 2, DRONE_W, DRONE_H)
         .setInteractive()
         .setDepth(DEPTH)
       const slotIdx = i
@@ -214,12 +250,12 @@ export class BottomHud {
             : 'Sin energía en la bahía de drones'
         return `${def.name} (${def.power}⚡)\n${def.desc}\nEstado: ${status}`
       })
-      this.droneWidgets.push({ gfx, zone, lastKey: '' })
-      this.disposables.push(gfx, zone)
+      this.droneWidgets.push({ gfx, role, status, zone, lastKey: '' })
+      this.disposables.push(gfx, role, status, zone)
     }
 
     // --- SPACE→pause hint (the "?" AYUDA affordance was removed) ---
-    // Centred in the freed column between the drones and the jump button.
+    // Sits in the freed space to the right of the drone cards.
     const hint = makeText(
       scene,
       HELP_X + 35,
@@ -233,31 +269,41 @@ export class BottomHud {
       .setDepth(DEPTH)
     this.disposables.push(hint)
 
-    // --- jump ---
+    // --- jump (top-left, right of the vital-stats panel) ---
     this.jumpGfx = scene.add.graphics().setDepth(DEPTH)
     this.disposables.push(this.jumpGfx)
-    this.jumpTitle = makeText(scene, JUMP_X + JUMP_W / 2, BAR_Y + 30, 'SALTO', 12)
+    this.jumpTitle = makeText(scene, JUMP_X + JUMP_W / 2, JUMP_Y + 22, 'SALTO', 12)
       .setOrigin(0.5)
       .setDepth(DEPTH + 1)
     this.disposables.push(this.jumpTitle)
-    this.jumpReason = makeText(scene, JUMP_X + JUMP_W / 2, BAR_Y + 52, '', 9, COLORS_CSS.warn, {
+    this.jumpReason = makeText(scene, JUMP_X + JUMP_W / 2, JUMP_Y + 44, '', 9, COLORS_CSS.warn, {
       align: 'center',
       wordWrap: { width: JUMP_W - 12 },
     })
       .setOrigin(0.5, 0)
       .setDepth(DEPTH + 1)
     this.disposables.push(this.jumpReason)
-    this.jumpBar = new ProgressBar(scene, JUMP_X + 8, BAR_Y + 96, JUMP_W - 16, 10, {
+    this.jumpBar = new ProgressBar(scene, JUMP_X + 8, JUMP_Y + 86, JUMP_W - 16, 10, {
       color: COLORS.panelBorder,
     })
     this.jumpBar.setDepth(DEPTH + 1)
+    // Visible amber action button (no need to hunt for the J key); shown only when
+    // the jump is ready and unblocked. The whole card stays hoverable for the tip.
+    this.jumpBtn = new Button(
+      scene,
+      JUMP_X + JUMP_W / 2,
+      JUMP_Y + 92,
+      this.beacon ? 'SALTAR' : 'HUIR',
+      () => this.cb.onJumpClick(),
+      { width: JUMP_W - 20, height: 34, variant: 'warn', fontSize: 16 },
+    )
+    this.jumpBtn.setDepth(DEPTH + 2).setVisible(false)
+    this.jumpBtn.setTooltip(() => deps.fleeTooltip)
+    this.disposables.push(this.jumpBtn)
     const jumpZone = scene.add
-      .zone(JUMP_X + JUMP_W / 2, BAR_Y + 67, JUMP_W, 120)
+      .zone(JUMP_X + JUMP_W / 2, JUMP_Y + JUMP_H / 2, JUMP_W, JUMP_H)
       .setInteractive()
       .setDepth(DEPTH)
-    jumpZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.rightButtonDown()) this.cb.onJumpClick()
-    })
     Tooltip.attach(jumpZone, () => deps.fleeTooltip)
     this.disposables.push(jumpZone)
 
@@ -587,60 +633,57 @@ export class BottomHud {
 
     const g = widget.gfx
     const x = DRONE_X + i * DRONE_STEP
-    const y = BAR_Y + 14
+    const y = BAR_Y + 6
+    const cx = x + DRONE_W / 2
     g.clear()
+
     if (d === undefined) {
-      g.lineStyle(1, 0x35506e, 0.6)
-      g.strokeRoundedRect(x, y, 54, 106, 6)
-      g.lineStyle(1.5, COLORS.textDim, 0.5)
-      g.lineBetween(x + 20, y + 53, x + 34, y + 53)
+      g.lineStyle(1, 0x35506e, 0.5)
+      g.strokeRoundedRect(x, y, DRONE_W, DRONE_H, 6)
+      g.lineStyle(1.5, COLORS.textDim, 0.4)
+      g.lineBetween(cx - 7, y + 22, cx + 7, y + 22)
+      widget.role.setText('')
+      widget.status.setText('VACÍO').setColor(COLORS_CSS.textDim)
       return
     }
+
+    const def = DRONES[d.droneId]
     const active = d.enabled && d.powered
     const dim = d.enabled && !d.powered
-    const borderColor = active ? COLORS.ok : dim ? COLORS.warn : 0x35506e
+    const border = active ? COLORS.ok : dim ? COLORS.warn : 0x35506e
+    const iconColor = active ? COLORS.text : dim ? COLORS.warn : COLORS.textDim
+
     g.fillStyle(0x0c1320, 0.95)
-    g.fillRoundedRect(x, y, 54, 106, 6)
-    g.lineStyle(1.5, borderColor, 1)
-    g.strokeRoundedRect(x, y, 54, 106, 6)
+    g.fillRoundedRect(x, y, DRONE_W, DRONE_H, 6)
+    g.lineStyle(1.5, border, 1)
+    g.strokeRoundedRect(x, y, DRONE_W, DRONE_H, 6)
 
-    const iconColor = active ? COLORS.text : COLORS.textDim
-    const alpha = d.enabled ? 1 : 0.45
-    g.fillStyle(iconColor, alpha)
-    g.lineStyle(1.5, iconColor, alpha)
-    // Hexagonal drone chassis + role glyph.
-    g.beginPath()
-    for (let k = 0; k < 6; k++) {
-      const a = (Math.PI / 3) * k - Math.PI / 6
-      const px = x + 27 + Math.cos(a) * 15
-      const py = y + 26 + Math.sin(a) * 15
-      if (k === 0) g.moveTo(px, py)
-      else g.lineTo(px, py)
-    }
-    g.closePath()
-    g.strokePath()
-    const def = DRONES[d.droneId]
-    if (def.kind === 'offensive') {
-      g.strokeCircle(x + 27, y + 26, 6)
-      g.lineBetween(x + 27 - 9, y + 26, x + 27 + 9, y + 26)
-      g.lineBetween(x + 27, y + 26 - 9, x + 27, y + 26 + 9)
-    } else if (def.kind === 'defensive') {
-      drawSystemIcon(g, 'shields', x + 27, y + 26, 11, iconColor)
-    } else {
-      drawTaskIcon(g, 'repair', x + 27, y + 26, 11, iconColor)
-    }
-    if (dim) drawPlugCrossed(g, x + 27, y + 56, 11, COLORS.warn)
+    drawDroneIcon(g, def.kind, cx, y + 22, 22, iconColor)
 
-    // On/off status as shape + color (check mark vs cross), never color alone.
-    g.fillStyle(active ? COLORS.ok : COLORS.textDim, 1)
-    g.fillCircle(x + 12, y + 90, 3)
-    g.lineStyle(1.5, active ? COLORS.ok : COLORS.textDim, 1)
-    if (d.enabled) {
-      g.lineBetween(x + 22, y + 90, x + 26, y + 94)
-      g.lineBetween(x + 26, y + 94, x + 36, y + 84)
-    } else {
-      g.lineBetween(x + 22, y + 85, x + 32, y + 95)
-      g.lineBetween(x + 32, y + 85, x + 22, y + 95)
+    widget.role.setText(DRONE_ROLE[def.kind]).setColor(active ? COLORS_CSS.text : COLORS_CSS.textDim)
+    const [statusText, statusColor]: [string, string] = active
+      ? ['ACTIVO', COLORS_CSS.ok]
+      : dim
+        ? ['SIN ⚡', COLORS_CSS.warn]
+        : ['APAGADO', COLORS_CSS.textDim]
+    widget.status.setText(statusText).setColor(statusColor)
+
+    // Power pips: the energy the drone bay must supply to run this drone.
+    const pipW = 7
+    const pipH = 4
+    const gap = 3
+    const totalW = def.power * pipW + (def.power - 1) * gap
+    const px0 = cx - totalW / 2
+    const py = y + DRONE_H - 12
+    for (let p = 0; p < def.power; p++) {
+      const px = px0 + p * (pipW + gap)
+      if (active) {
+        g.fillStyle(COLORS.energy, 1)
+        g.fillRect(px, py, pipW, pipH)
+      } else {
+        g.lineStyle(1, dim ? COLORS.warn : COLORS.textDim, 0.8)
+        g.strokeRect(px, py, pipW, pipH)
+      }
     }
   }
 
@@ -656,20 +699,29 @@ export class BottomHud {
         ? COLORS.warn
         : COLORS.panelBorder
     g.fillStyle(0x0c1320, 0.95)
-    g.fillRoundedRect(JUMP_X, BAR_Y + 8, JUMP_W, 118, 6)
+    g.fillRoundedRect(JUMP_X, JUMP_Y, JUMP_W, JUMP_H, 6)
     g.lineStyle(2, border, 1)
-    g.strokeRoundedRect(JUMP_X, BAR_Y + 8, JUMP_W, 118, 6)
+    g.strokeRoundedRect(JUMP_X, JUMP_Y, JUMP_W, JUMP_H, 6)
 
-    if (j.ready && j.blocked === 'no_crew') {
+    // The amber SALTAR/HUIR button shows only when the jump can actually fire; the
+    // progress bar shows only while charging. (Hidden controls also stop catching
+    // clicks, so a charging card can't be "jumped".)
+    const canJump = j.ready && j.blocked === null
+    const charging = !j.ready && j.blocked !== 'no_engine_power'
+    this.jumpBtn.setVisible(canJump)
+    if (this.jumpBtn.input) this.jumpBtn.input.enabled = canJump
+    this.jumpBar.setVisible(charging)
+
+    if (canJump) {
+      this.jumpTitle.setText('¡SALTO LISTO!')
+      this.jumpTitle.setColor(COLORS_CSS.ok)
+      this.jumpReason.setText(this.beacon ? 'Al mapa de sector' : 'Huir del combate')
+      this.jumpReason.setColor(COLORS_CSS.textDim)
+    } else if (j.ready && j.blocked === 'no_crew') {
       this.jumpTitle.setText('SALTO LISTO')
       this.jumpTitle.setColor(COLORS_CSS.warn)
       this.jumpReason.setText('Tripula los motores para saltar')
       this.jumpReason.setColor(COLORS_CSS.warn)
-    } else if (j.ready) {
-      this.jumpTitle.setText('¡SALTO LISTO!')
-      this.jumpTitle.setColor(COLORS_CSS.ok)
-      this.jumpReason.setText('[J] Huir del combate')
-      this.jumpReason.setColor(COLORS_CSS.textDim)
     } else if (j.blocked === 'no_engine_power') {
       this.jumpTitle.setText('SALTO')
       this.jumpTitle.setColor(COLORS_CSS.textDim)
@@ -739,7 +791,7 @@ export class BottomHud {
   }
 
   jumpRect(): Rect {
-    return { x: JUMP_X, y: BAR_Y + 8, w: JUMP_W, h: 118 }
+    return { x: JUMP_X, y: JUMP_Y, w: JUMP_W, h: JUMP_H }
   }
 
   destroy(): void {

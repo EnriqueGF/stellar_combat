@@ -105,6 +105,13 @@ export class ShipView {
   private readonly cellsW: number
 
   private readonly roomBase: Phaser.GameObjects.Graphics
+  /** Per-room wall consoles + their lit screens (FTL-style manning stations). */
+  private readonly consoleGfx: Phaser.GameObjects.Graphics
+  private readonly consoleScreenGfx: Phaser.GameObjects.Graphics
+  /** Console anchor (where idle crew gather to "type"), keyed by room id. */
+  private readonly consoleAnchors = new Map<number, Vec2>()
+  /** Rooms with a crew currently manning the console (screen lit), updated per frame. */
+  private mannedRooms = new Set<number>()
   private readonly envGfx: Phaser.GameObjects.Graphics
   private readonly iconGfx: Phaser.GameObjects.Graphics
   private readonly doorGfx: Phaser.GameObjects.Graphics
@@ -193,16 +200,21 @@ export class ShipView {
 
     // --- room layers ---
     this.roomBase = scene.add.graphics()
+    this.consoleGfx = scene.add.graphics()
+    this.consoleScreenGfx = scene.add.graphics()
     this.envGfx = scene.add.graphics()
     this.iconGfx = scene.add.graphics()
     this.doorGfx = scene.add.graphics()
     this.hoverGfx = scene.add.graphics()
     this.container.add(this.roomBase)
+    this.container.add(this.consoleGfx)
+    this.container.add(this.consoleScreenGfx)
     this.container.add(this.envGfx)
     this.container.add(this.iconGfx)
     this.container.add(this.doorGfx)
     this.container.add(this.hoverGfx)
     this.drawRoomBases()
+    this.drawConsoles()
 
     // --- particles ---
     this.fireEmitter = scene.add.particles(0, 0, PARTICLE_KEY, {
@@ -516,6 +528,49 @@ export class ShipView {
     }
   }
 
+  /** A small wall console per room (FTL manning station): a desk against the bottom
+   *  wall with a lit screen. Idle/operating crew gather here to "type", clear of
+   *  the centred system icon. Drawn once; the screen glow is animated in update(). */
+  private drawConsoles(): void {
+    const g = this.consoleGfx
+    g.clear()
+    this.consoleScreenGfx.setBlendMode(Phaser.BlendModes.ADD)
+    this.consoleAnchors.clear()
+    for (const r of this.rooms) {
+      const rr = this.roomRect(r.id)
+      if (rr === null) continue
+      const cw = clamp(this.cell * 0.5, 16, 28)
+      const cx = rr.x + rr.w / 2
+      const deskY = rr.y + rr.h - 7 // desk top, just inside the bottom wall
+      // Desk + dark screen recess (the lit part is the additive layer below).
+      g.fillStyle(0x223047, 1)
+      g.fillRoundedRect(cx - cw / 2, deskY, cw, 5, 1)
+      g.lineStyle(1, 0x3a4f6b, 1)
+      g.strokeRoundedRect(cx - cw / 2, deskY, cw, 5, 1)
+      g.fillStyle(0x05080f, 1)
+      g.fillRect(cx - cw * 0.3, rr.y + rr.h - 13, cw * 0.6, 4)
+      // Crew stand right at the console, against the bottom wall.
+      this.consoleAnchors.set(r.id, { x: cx, y: rr.y + rr.h - 12 })
+    }
+    this.redrawConsoleScreens(0)
+  }
+
+  /** Additive screen glow; manned consoles flicker brighter (the "typing" light). */
+  private redrawConsoleScreens(time: number): void {
+    const g = this.consoleScreenGfx
+    g.clear()
+    for (const r of this.rooms) {
+      const rr = this.roomRect(r.id)
+      if (rr === null) continue
+      const cw = clamp(this.cell * 0.5, 16, 28)
+      const cx = rr.x + rr.w / 2
+      const manned = this.mannedRooms.has(r.id)
+      const glow = manned ? 0.45 + 0.35 * Math.abs(Math.sin(time / 110 + r.id * 1.7)) : 0.14
+      g.fillStyle(COLORS.panelBorder, glow)
+      g.fillRect(cx - cw * 0.3, rr.y + rr.h - 13, cw * 0.6, 4)
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Snapshot application (10 Hz)
   // -------------------------------------------------------------------------
@@ -571,7 +626,8 @@ export class ShipView {
       this.redrawIcons()
     }
     if (this.doorsAnimating) this.animateDoors(dtMs)
-    this.updateCrewPositions(time, dtMs)
+    this.updateCrewPositions(time, dtMs) // sets mannedRooms for the screens below
+    this.redrawConsoleScreens(time)
     this.emitEnvParticles(dtMs)
   }
 
@@ -686,7 +742,9 @@ export class ShipView {
       const damaged = sys.damage > 0.05
       const color = destroyed ? COLORS.danger : damaged ? COLORS.warn : COLORS.textDim
       const cx = rr.x + rr.w / 2
-      const cy = rr.y + rr.h / 2
+      // Sit the icon in the upper-middle so idle crew at the wall console (bottom)
+      // never cover it, even in small 1×1 rooms.
+      const cy = rr.y + rr.h * 0.4
       drawSystemIcon(g, sys.id, cx, cy, 16, color)
       if (destroyed) drawCrossOut(g, cx, cy, 18, COLORS.danger)
 
@@ -925,14 +983,21 @@ export class ShipView {
   }
 
   private updateCrewPositions(time: number, dtMs: number): void {
-    // Stationary occupancy slots so tokens in the same room do not overlap.
-    const occupancy = new Map<number, string[]>()
+    // Stationary crew split by what they're doing: idle/operating crew gather at
+    // the wall console (clear of the icon); crew on an emergency task stay at the
+    // system (centre). Separate occupancy lists keep each group from overlapping.
+    const idleOcc = new Map<number, string[]>()
+    const workOcc = new Map<number, string[]>()
+    this.mannedRooms.clear()
     for (const member of this.state.crew) {
-      if (member.path.length === 0) {
-        const list = occupancy.get(member.roomId) ?? []
-        list.push(member.id)
-        occupancy.set(member.roomId, list)
-      }
+      if (member.path.length !== 0) continue
+      const token = this.tokens.get(member.id)
+      if (token === undefined || token.lastDead) continue
+      const map = token.working ? workOcc : idleOcc
+      const list = map.get(member.roomId) ?? []
+      list.push(member.id)
+      map.set(member.roomId, list)
+      if (!token.working) this.mannedRooms.add(member.roomId)
     }
 
     for (const member of this.state.crew) {
@@ -940,6 +1005,7 @@ export class ShipView {
       if (token === undefined) continue
 
       let target: Vec2
+      let typing = false
       const nextRoom = member.path[0]
       if (nextRoom !== undefined) {
         const a = this.roomCenter(member.roomId)
@@ -956,9 +1022,19 @@ export class ShipView {
         } else {
           target = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
         }
+      } else if (!token.working && !token.lastDead) {
+        // Idle / operating: stand at the wall console and "type".
+        const anchor = this.consoleAnchors.get(member.roomId) ?? this.roomCenter(member.roomId)
+        const mates = idleOcc.get(member.roomId) ?? []
+        const idx = mates.indexOf(member.id)
+        const n = mates.length
+        const off = n > 1 && idx >= 0 ? (idx - (n - 1) / 2) * (TOKEN_RADIUS * 2 + 2) : 0
+        target = { x: anchor.x + off, y: anchor.y }
+        typing = true
       } else {
+        // Working an emergency (or dead): stay at the system.
         const c = this.roomCenter(member.roomId)
-        const mates = occupancy.get(member.roomId) ?? []
+        const mates = workOcc.get(member.roomId) ?? []
         const idx = mates.indexOf(member.id)
         const n = mates.length
         if (n > 1 && idx >= 0) {
@@ -987,7 +1063,13 @@ export class ShipView {
         }
       }
 
-      const bob = token.working && !token.lastDead ? Math.sin(time / 130) * 1.6 : 0
+      const bob = token.lastDead
+        ? 0
+        : token.working
+          ? Math.sin(time / 130) * 1.6
+          : typing
+            ? Math.sin(time / 85) * 0.9
+            : 0
       token.container.setPosition(token.pos.x, token.pos.y + bob)
     }
   }

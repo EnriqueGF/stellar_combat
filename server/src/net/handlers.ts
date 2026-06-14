@@ -291,6 +291,44 @@ export function registerHandlers(
     startHost(host)
   }
 
+  /**
+   * FTL-style safe stop between nodes: the player's ship alone (no enemy), running
+   * real-time so the crew can heal/repair and the jump drive charges. Jumping ends
+   * the beacon (reason 'jumped') and the client opens the sector map. Any healing /
+   * repairs / power changes are persisted back into the run on jump.
+   */
+  const startBeacon = (p: Player, run: RunManager): void => {
+    const dummy = NPC_TEMPLATES[0]
+    if (!dummy) return
+    let host: BattleHost | null = null
+    host = new BattleHost(run.playerSetup(), setupFromNpc(dummy), { a: p, b: null }, {
+      ...hostConfigBase((result, sim): void => {
+        if (host) liveHosts.delete(host)
+        if (result.reason === 'jumped') {
+          // Carry the prep (hull/ammo/crew HP/power) into the run, drop any node
+          // rewards left untaken, then open the map.
+          const me = sim.shipState('a')
+          const power: Partial<Record<SystemId, number>> = {}
+          for (const s of me.systems) power[s.id] = s.power
+          run.absorbBattleState(me.hull, me.ammo, sim.crewExport('a'), power)
+          run.settle()
+          p.socket?.emit('run:state', run.publicState())
+        } else {
+          // Surrender at a beacon (escape menu) = abandon the expedition.
+          run.markDefeat()
+          recordRunOver(p, run, false)
+          p.socket?.emit('run:over', false, { column: run.column, scrap: run.scrapTotal })
+          p.run = null
+        }
+      }),
+      mode: 'beacon',
+      pauseAllowed: true,
+      suddenDeathSec: null,
+      backdropSeed: run.currentNode().seed,
+    })
+    startHost(host)
+  }
+
   io.on('connection', (socket: GameSocket) => {
     let player: Player | null = null
 
@@ -335,9 +373,14 @@ export function registerHandlers(
       broadcastLobby()
 
       if (p.battle) {
-        // Live battle: re-bind and replay battle:start with the current snapshot.
-        if (p.run) socket.emit('run:state', p.run.publicState())
+        // Live battle: re-bind and replay battle:start FIRST so the client sets
+        // state.snapshot and routes into the Battle scene. Emitting run:state before
+        // it would hijack navigation to the sector map — its resume rule fires while
+        // snapshot is still null — and the battle:start that follows gets swallowed by
+        // the in-flight transition, stranding the player at a menu while the server
+        // keeps the battle alive (then everything reads "Ya estás en combate").
         p.battle.host.onReconnect(p.battle.side, socket)
+        if (p.run) socket.emit('run:state', p.run.publicState())
       } else if (p.run) {
         if (p.run.isAlive && p.run.rng() < AMBUSH_CHANCE_ON_RECONNECT) {
           startAmbush(p, p.run)
@@ -412,6 +455,11 @@ export function registerHandlers(
         accounts.updateStats(p.accountId, (s) => {
           s.runsStarted += 1
         })
+        // FTL-style: the expedition opens at a beacon (the ship alone). The player
+        // preps, then jumps to reveal the sector map. battle:start must precede
+        // run:state so the client routes into the beacon (a run:state first would
+        // send it to the sector map and swallow the battle:start mid-transition).
+        startBeacon(p, p.run)
         socket.emit('run:state', p.run.publicState())
         return
       }
@@ -534,8 +582,12 @@ export function registerHandlers(
       switch (entry.kind) {
         case 'invalid':
           return sendError('bad_intent', 'Ese nodo no es alcanzable desde tu posición.')
-        case 'screen':
+        case 'screen': {
+          // A store node opens a beacon with its wares in the in-ship economy panel;
+          // a narrative event still uses the Event scene. battle:start before run:state.
+          if (run.publicState().shopOffers !== null) startBeacon(p, run)
           return socket.emit('run:state', run.publicState())
+        }
         case 'battle':
           return startRunBattle(p, run, entry)
       }
@@ -574,9 +626,15 @@ export function registerHandlers(
     })
 
     socket.on('run:continue', () => {
+      const p = player
       const run = requireRun()
-      if (!run) return
+      if (!p || !run) return
+      if (p.battle) return // already at a beacon / in battle (e.g. a double-click)
       run.continueRun()
+      // FTL flow: leaving a node (event/shop/upgrade) drops the player at a beacon
+      // (the ship alone) rather than straight onto the map; they jump from there.
+      // battle:start must precede run:state (see startBeacon / the reconnect fix).
+      startBeacon(p, run)
       socket.emit('run:state', run.publicState())
     })
 

@@ -37,6 +37,9 @@ export interface TargetingDeps {
   hud: BottomHud
   portraits: CrewPortraits
   getYou(): ShipState
+  /** Beacon mode: no enemy (enemyView is aliased to the player's own), so weapon
+   *  targeting and the enemy room-click wiring are disabled. */
+  beacon?: boolean
 }
 
 interface Badge {
@@ -90,10 +93,15 @@ export class TargetingController {
     // the pointer handlers below, so a click moves the selected crew and a drag
     // box-selects several at once (the room/crew zones would fire on pointerDOWN,
     // which can't tell a click from the start of a drag).
-    deps.enemyView.onRoomClick = (roomId, right) => this.enemyRoomClick(roomId, right)
-    deps.enemyView.onRoomHover = (roomId) => {
-      this.hoverRoom = roomId
-      this.refreshHover()
+    // At a beacon enemyView is aliased to the player's own ship, so wiring these
+    // would make the player's rooms cancel the crew selection on right-click —
+    // skip them entirely (no enemy to target anyway).
+    if (!deps.beacon) {
+      deps.enemyView.onRoomClick = (roomId, right) => this.enemyRoomClick(roomId, right)
+      deps.enemyView.onRoomHover = (roomId) => {
+        this.hoverRoom = roomId
+        this.refreshHover()
+      }
     }
 
     this.onPointerMove = (pointer) => this.handlePointerMove(pointer)

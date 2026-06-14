@@ -65,6 +65,9 @@ export interface BattleOptions {
   pauseAllowed: boolean
   /** Seconds after which shield regen disables (duel anti-stalemate); null = never. */
   suddenDeathSec: number | null
+  /** Beacon mode: a safe stop with no enemy. Jumping ends the sim with reason
+   *  'jumped' (advance to the map) instead of fleeing a fight. */
+  beacon?: boolean
 }
 
 /**

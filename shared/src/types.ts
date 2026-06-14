@@ -400,8 +400,9 @@ export interface BattleResultStats {
 
 export interface BattleResult {
   winner: Side | null
-  /** How the battle ended. */
-  reason: 'destroyed' | 'crew_dead' | 'fled' | 'surrender' | 'disconnect'
+  /** How the battle ended. 'jumped' = a beacon stop the player jumped away from
+   *  (no combat) — the run advances to the map rather than resolving a fight. */
+  reason: 'destroyed' | 'crew_dead' | 'fled' | 'surrender' | 'disconnect' | 'jumped'
   stats: Record<Side, BattleResultStats>
 }
 

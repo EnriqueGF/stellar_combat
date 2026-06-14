@@ -2,6 +2,7 @@
 // tick() at 20 tps, drains events after each tick and broadcasts snapshots at 10 Hz.
 
 import {
+  BEACON_JUMP_CHARGE_SEC,
   BOSS_PHASE2_BONUS_POWER,
   COCKPIT_JUMP_MULT,
   DEFENSE_MODULES,
@@ -149,14 +150,21 @@ export class BattleSim implements IBattleSim {
       const cockpit = findSystem(ship, 'cockpit')
       const level = clamp(cockpit ? usableLevel(cockpit) : 1, 1, COCKPIT_JUMP_MULT.length)
       const mult = COCKPIT_JUMP_MULT[level - 1] ?? 1
-      ship.jump.progress = Math.min(1, ship.jump.progress + DT / (JUMP_CHARGE_SEC / mult))
+      // A safe beacon spools up fast; fleeing a fight charges slowly.
+      const chargeSec = this.options.beacon ? BEACON_JUMP_CHARGE_SEC : JUMP_CHARGE_SEC
+      ship.jump.progress = Math.min(1, ship.jump.progress + DT / (chargeSec / mult))
       if (ship.jump.progress >= 1) {
         ship.jump.ready = true
         this.ctx.events.push({ t: 'jump_charged', side })
       }
     }
-    // Once charged, performing the jump needs a crew member in the engine room.
-    ship.jump.blocked = ship.jump.ready && !engineRoomManned(ship) ? 'no_crew' : null
+    // Fleeing a fight needs a crew member in the engine room; jumping from a safe
+    // beacon does not (take your time, then go).
+    ship.jump.blocked = this.options.beacon
+      ? null
+      : ship.jump.ready && !engineRoomManned(ship)
+        ? 'no_crew'
+        : null
   }
 
   private checkBossPhase(side: Side): void {
@@ -265,11 +273,18 @@ export class BattleSim implements IBattleSim {
     door.open = !door.open
   }
 
-  /** Player flee command: only fires when the drive is charged and engines are manned. */
+  /** Player jump command: only fires when the drive is charged and engines are manned.
+   *  At a beacon (no enemy) it advances to the map; in combat it flees the fight. */
   requestJump(side: Side): void {
     if (this.result !== null) return
     const ship = this.ctx.ships[side]
-    if (!ship.jump.ready || !engineRoomManned(ship)) return
+    if (!ship.jump.ready) return
+    if (this.options.beacon) {
+      this.ctx.events.push({ t: 'log', msg: `${ship.name} salta a las coordenadas.` })
+      this.finish(side, 'jumped')
+      return
+    }
+    if (!engineRoomManned(ship)) return
     this.ctx.events.push({ t: 'fled', side })
     this.ctx.events.push({ t: 'log', msg: `${ship.name} ha saltado y huye del combate.` })
     this.finish(otherSide(side), 'fled')

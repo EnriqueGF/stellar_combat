@@ -78,6 +78,9 @@ export const BREACH_SEAL_RATE = 8 // breach % removed per second by one crew
 // can't simply jump out of every fight that turns against you.
 export const JUMP_CHARGE_SEC = 50
 export const COCKPIT_JUMP_MULT = [1, 1.5, 2] as const // by cockpit level
+// At a safe beacon (no enemy) the drive spools up quickly: the jump becomes
+// available within a few seconds, and the player can linger as long as they want.
+export const BEACON_JUMP_CHARGE_SEC = 3
 
 // --- Weapons handling ---
 /** Charge fraction kept when a weapon loses power. */

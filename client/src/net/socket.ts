@@ -43,6 +43,7 @@
 //   'battle:events'   (events: BattleEvent[])
 //   'run:refresh'     ()    — state.run changed; active run scene re-renders
 //   'run:over'        ()    — state.runOver is set
+//   'error'           (err) — a server intent was rejected (un-gates busy UI)
 // Use scOn(scene, event, fn) to auto-unsubscribe on scene shutdown.
 
 import Phaser from 'phaser'
@@ -303,6 +304,13 @@ export function installRouting(game: Phaser.Game): void {
       startScene(game, 'SectorMap')
       return
     }
+    // At a beacon (a Battle scene) run state changes (e.g. after a purchase) must
+    // refresh the in-ship economy panel WITHOUT navigating — the beacon owns its
+    // own exit (battle:end on jump). Normal battles ignore run:refresh.
+    if (active === 'Battle') {
+      sc.emit('run:refresh')
+      return
+    }
     if (active === null || !RUN_ROUTED_SCENES.has(active)) return
     let target: SceneKey
     if (run.event !== null || run.eventResult !== null) target = 'Event'
@@ -330,5 +338,9 @@ export function installRouting(game: Phaser.Game): void {
   socket.on('error', (err) => {
     getAudio().play('error')
     Toast.show(err.msg, 'error')
+    // A rejected intent (e.g. a failed run:buy) sends 'error' instead of the
+    // run:state that scenes wait on. Re-broadcast so a scene that optimistically
+    // gated its UI (Shop/Upgrade 'busy') can un-gate and stay responsive.
+    sc.emit('error', err)
   })
 }

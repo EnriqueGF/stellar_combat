@@ -22,7 +22,7 @@ export interface ButtonOpts {
   width?: number
   height?: number
   fontSize?: number
-  variant?: 'primary' | 'danger' | 'ghost'
+  variant?: 'primary' | 'danger' | 'ghost' | 'warn'
   disabled?: boolean
 }
 
@@ -31,7 +31,7 @@ export class Button extends Phaser.GameObjects.Container {
   private readonly labelText: Phaser.GameObjects.Text
   private readonly bw: number
   private readonly bh: number
-  private readonly variant: 'primary' | 'danger' | 'ghost'
+  private readonly variant: 'primary' | 'danger' | 'ghost' | 'warn'
   private hovered = false
   private disabledFlag: boolean
   private disabledReason: string | null = null
@@ -114,10 +114,13 @@ export class Button extends Phaser.GameObjects.Container {
     const border =
       this.variant === 'danger'
         ? COLORS.danger
-        : this.variant === 'ghost'
-          ? COLORS.textDim
-          : COLORS.panelBorder
-    const textColor = this.variant === 'danger' ? COLORS.danger : COLORS.text
+        : this.variant === 'warn'
+          ? COLORS.warn
+          : this.variant === 'ghost'
+            ? COLORS.textDim
+            : COLORS.panelBorder
+    const textColor =
+      this.variant === 'danger' ? COLORS.danger : this.variant === 'warn' ? COLORS.warn : COLORS.text
     const g = this.bg
     g.clear()
     const alpha = this.disabledFlag ? 0.4 : 1

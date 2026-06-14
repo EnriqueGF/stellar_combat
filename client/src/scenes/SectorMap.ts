@@ -241,7 +241,9 @@ export class SectorMapScene extends Phaser.Scene {
       hit.on('pointerdown', () => {
         if (this.choosing) return
         this.choosing = true
-        getAudio().play('click')
+        // Travelling between beacons IS a jump: sound + white flash for the FTL feel.
+        getAudio().play('jump')
+        this.cameras.main.flash(320, 255, 255, 255)
         getNet().socket.emit('run:choose_node', node.id)
         // Server replies with battle:start or run:state; routing navigates.
       })

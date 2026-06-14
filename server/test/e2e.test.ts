@@ -72,6 +72,28 @@ test('expedition end-to-end over sockets', async () => {
     assert.equal(intro.col, 1)
     assert.equal(intro.type, 'combat')
 
+    // FTL flow: the expedition opens at a beacon (the ship alone, no enemy). The
+    // drive spools up in a few seconds; jump out of it to reach the sector map.
+    // Attach the end/refresh listeners BEFORE jumping (the server emits both
+    // synchronously, so a post-jump waitFor would race past them).
+    const beaconEndP = waitFor(socket, 'battle:end')
+    const mapRefreshP = waitFor(socket, 'run:state')
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('beacon jump never charged')), 9000)
+      const onSnap = (snap: BattleSnapshot): void => {
+        if (snap.you.jump.ready && snap.you.jump.blocked === null) {
+          clearTimeout(timer)
+          socket.off('battle:snapshot', onSnap)
+          socket.emit('battle:jump')
+          resolve()
+        }
+      }
+      socket.on('battle:snapshot', onSnap)
+    })
+    const [beaconEnd] = await beaconEndP
+    assert.equal(beaconEnd.reason, 'jumped')
+    await mapRefreshP // map refresh after the beacon jump
+
     // Choosing the column-1 node opens the narrated first-contact encounter,
     // which names the hostile ship before any shooting.
     const encounterP = waitFor(socket, 'run:state')

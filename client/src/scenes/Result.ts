@@ -14,6 +14,7 @@ import { Panel } from '../ui/panel'
 import { drawScrapIcon } from '../battle/icons'
 import { addText, formatDuration, menuChrome, textStyle } from '../ui/helpers'
 import { getState } from '../state'
+import { getNet } from '../net/socket'
 import { getAudio } from '../audio/engine'
 import { fadeInScene, goToScene } from '../ui/transition'
 
@@ -23,6 +24,7 @@ export class ResultScene extends Phaser.Scene {
   private result: BattleResult | null = null
   private yourSide: Side = 'a'
   private mode: 'expedition' | 'duel' = 'duel'
+  private continuing = false
 
   constructor() {
     super('Result')
@@ -37,6 +39,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.continuing = false
     menuChrome(this)
     getAudio().music('menu')
     const result = this.result
@@ -85,6 +88,9 @@ export class ResultScene extends Phaser.Scene {
         return youWon ? 'El rival se ha rendido.' : 'Te has rendido.'
       case 'disconnect':
         return youWon ? 'El rival se ha desconectado.' : 'Desconexión del combate.'
+      case 'jumped':
+        // Beacons never reach the Result screen, but keep the switch exhaustive.
+        return 'Salto realizado.'
     }
   }
 
@@ -204,8 +210,12 @@ export class ResultScene extends Phaser.Scene {
     const runAlive =
       this.mode === 'expedition' && state.runOver === null && state.run !== null && state.run.alive
     if (runAlive && verdict !== 'defeat') {
+      // Continue → the server drops the ship at a beacon (repairs/upgrades/loot
+      // live there now); battle:start routes us in. No local navigation.
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, 'CONTINUAR', () => {
-        goToScene(this, 'Upgrade')
+        if (this.continuing) return
+        this.continuing = true
+        getNet().socket.emit('run:continue')
       }, { width: 280, height: 54 })
     } else {
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, 'MENÚ PRINCIPAL', () => {

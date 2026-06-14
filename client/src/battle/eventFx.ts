@@ -19,6 +19,7 @@ import { COLORS, catColor } from '../theme'
 import type { CombatLog } from './combatLog'
 import type { CrewPortraits } from './portraits'
 import type { ShipView } from './shipView'
+import type { DroneSwarm } from './drones'
 import { SYSTEM_NAMES, type Vec2 } from './common'
 
 const SHOT_SFX: Record<ProjectileKind, SfxName> = {
@@ -34,6 +35,8 @@ export interface EventRouterDeps {
   mySide: Side
   /** View of the ship OWNED by the given side. */
   viewFor(side: Side): ShipView
+  /** Orbiting drone craft of the ship OWNED by the given side. */
+  droneSwarmFor(side: Side): DroneSwarm
   bubbleFor(side: Side): IShieldBubble
   log: CombatLog
   audio: IAudioEngine
@@ -63,7 +66,12 @@ export class BattleEventRouter {
       case 'shot': {
         const firer = d.viewFor(ev.side)
         const target = d.viewFor(other(ev.side))
-        const from = ev.fromRoomId !== null ? firer.roomCenter(ev.fromRoomId) : firer.noseTip()
+        let from = ev.fromRoomId !== null ? firer.roomCenter(ev.fromRoomId) : firer.noseTip()
+        // A combat drone shot flies from the orbiting craft, not the drone bay.
+        if (ev.kind === 'drone_shot') {
+          const origin = d.droneSwarmFor(ev.side).combatFire()
+          if (origin !== null) from = origin
+        }
         const to = target.roomCenter(ev.targetRoomId)
         const def = ev.weaponId !== null ? WEAPONS[ev.weaponId] : null
         const color = def !== null ? catColor(def.category) : COLORS.catEnergy
@@ -97,7 +105,8 @@ export class BattleEventRouter {
             break
           }
           case 'intercepted': {
-            const p = this.interceptPoint(ev.side)
+            // Play the burst at the defense drone if one is deployed, else midway.
+            const p = d.droneSwarmFor(ev.side).defenseIntercept() ?? this.interceptPoint(ev.side)
             fx.intercept(d.scene, p.x, p.y)
             d.audio.play('intercept')
             d.log.add(

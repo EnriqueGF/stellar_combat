@@ -30,7 +30,7 @@ import {
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
-import { fadeInScene, goToScene } from '../ui/transition'
+import { fadeInScene } from '../ui/transition'
 
 const SYSTEM_ORDER: SystemId[] = [
   'weapons',
@@ -71,6 +71,11 @@ export class UpgradeScene extends Phaser.Scene {
     scOn(this, 'run:refresh', () => {
       this.busy = false
       this.render()
+    })
+    // A rejected purchase replies with 'error', not run:state: clear the gate so
+    // the panel never freezes (otherwise every button stays dead until you leave).
+    scOn(this, 'error', () => {
+      this.busy = false
     })
     fadeInScene(this)
   }
@@ -222,10 +227,13 @@ export class UpgradeScene extends Phaser.Scene {
     }
 
     // ----- Continue -------------------------------------------------------
+    // Leaving drops the ship at a beacon (the server starts it on run:continue and
+    // battle:start routes us there); jump from the beacon to reach the map.
     dyn.add(
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 46, 'CONTINUAR', () => {
+        if (this.busy) return
+        this.busy = true
         getNet().socket.emit('run:continue')
-        goToScene(this, 'SectorMap')
       }, { width: 280, height: 52 }),
     )
   }

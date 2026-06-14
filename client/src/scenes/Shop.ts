@@ -82,6 +82,11 @@ export class ShopScene extends Phaser.Scene {
       this.busy = false
       this.render()
     })
+    // A rejected buy/exit replies with 'error', not run:state: clear the gate so
+    // the shop never freezes (busy also gates SALIR, so all buttons would die).
+    scOn(this, 'error', () => {
+      this.busy = false
+    })
     fadeInScene(this)
   }
 

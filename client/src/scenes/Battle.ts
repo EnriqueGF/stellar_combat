@@ -38,9 +38,12 @@ import { CrewPortraits } from '../battle/portraits'
 import { EnemyReadout } from '../battle/enemyReadout'
 import { Readouts } from '../battle/readouts'
 import { ShipView } from '../battle/shipView'
+import { DroneSwarm } from '../battle/drones'
+import { openEconomyModal, type EconomyHandle } from '../battle/economy'
 import { TargetingController } from '../battle/targeting'
 import { TutorialController } from '../battle/tutorial'
 import { Toast, Tooltip } from '../battle/uiKit'
+import { Button } from '../ui/button'
 import { EscapeMenu } from '../ui/escapeMenu'
 
 const BIOMES: PlanetBiome[] = ['gas_giant', 'rocky', 'ice', 'volcanic', 'oceanic', 'desert']
@@ -51,19 +54,26 @@ export class BattleScene extends Phaser.Scene {
   private start!: BattleStartMsg
   private snap!: BattleSnapshot
   private mySide: Side = 'a'
+  /** Beacon mode (FTL safe stop): the player ship alone, no enemy, jump opens the map. */
+  private beacon = false
+  /** Open in-beacon economy panel, if any. */
+  private economy?: EconomyHandle
   private net!: Net
   private store!: GameStateStore
 
   private backdrop: ISpaceBackdrop | null = null
   private crt: ICrtOverlay | null = null
   private playerView!: ShipView
+  /** Aliased to playerView in beacon mode (no enemy is rendered). */
   private enemyView!: ShipView
   private playerBubble!: IShieldBubble
   private enemyBubble!: IShieldBubble
+  private playerSwarm!: DroneSwarm
+  private enemySwarm!: DroneSwarm
   private hud!: BottomHud
   private portraits!: CrewPortraits
   private readouts!: Readouts
-  private enemyReadout!: EnemyReadout
+  private enemyReadout?: EnemyReadout
   private log!: CombatLog
   private targeting!: TargetingController
   private tutorial!: TutorialController
@@ -92,11 +102,28 @@ export class BattleScene extends Phaser.Scene {
     for (const ev of events) {
       if (ev.t === 'fled' && ev.side === this.mySide) this.fledByMe = true
     }
-    this.router.handle(events)
+    // At a beacon the "enemy" is an inert dummy; drop its side's events so they
+    // can't log "enemy" lines or (via the aliased refs) corrupt the player view.
+    const list = this.beacon
+      ? events.filter((ev) => !('side' in ev) || ev.side === this.mySide)
+      : events
+    this.router.handle(list)
   }
   private readonly onEnd = (result: BattleResult, yourSide: Side): void => {
     if (this.ended) return
     this.ended = true
+    if (this.beacon) {
+      if (result.reason === 'jumped') {
+        // Jump away from the beacon: flash + sound, then reveal the sector map.
+        getAudio().play('jump')
+        this.cameras.main.flash(400, 255, 255, 255)
+        this.time.delayedCall(420, () => goToScene(this, 'SectorMap'))
+      } else {
+        // Abandoned the expedition from the beacon (escape menu).
+        goToScene(this, 'MainMenu')
+      }
+      return
+    }
     // Let the final VFX (explosion chain / jump flash) play before the switch.
     this.time.delayedCall(1500, () => {
       // The tutorial is practice: skip the Result screen and return to the menu.
@@ -128,6 +155,7 @@ export class BattleScene extends Phaser.Scene {
     this.start = data.start
     this.snap = data.start.snapshot
     this.mySide = data.start.side
+    this.beacon = data.start.mode === 'beacon'
     this.created = false
     this.ended = false
     this.fledByMe = false
@@ -154,9 +182,11 @@ export class BattleScene extends Phaser.Scene {
     audio.play('battle_start')
 
     // --- ships + shields ---
-    this.playerView = new ShipView(this, HUD.playerShipRect, this.snap.you, {
+    // At a beacon the ship sits alone, centred and larger (no enemy to share space).
+    const playerRect = this.beacon ? { x: 360, y: 78, w: 560, h: 482 } : HUD.playerShipRect
+    this.playerView = new ShipView(this, playerRect, this.snap.you, {
       facing: 1,
-      maxCell: 52,
+      maxCell: this.beacon ? 66 : 52,
       onToggleDoor: (doorId) => {
         if (this.ended) return
         const closing = this.snap.you.doors.find((d) => d.id === doorId)?.open === true
@@ -164,24 +194,38 @@ export class BattleScene extends Phaser.Scene {
         audio.play('door', { detune: closing ? -140 : 140 })
       },
     })
-    this.enemyView = new ShipView(this, HUD.enemyShipRect, this.snap.enemy, {
-      facing: -1,
-      maxCell: 44,
-    })
     const pb = this.playerView.bubbleParams()
     this.playerBubble = new ShieldBubble(this, pb.cx, pb.cy, pb.rx, pb.ry)
-    const eb = this.enemyView.bubbleParams()
-    this.enemyBubble = new ShieldBubble(this, eb.cx, eb.cy, eb.rx, eb.ry)
+
+    if (this.beacon) {
+      // No enemy at a beacon: alias the enemy refs to the player's own so the shared
+      // code paths stay valid; snapshot/update/destroy skip the (absent) enemy below.
+      this.enemyView = this.playerView
+      this.enemyBubble = this.playerBubble
+      this.playerSwarm = new DroneSwarm(this, this.playerView, this.playerView, this.snap.you)
+      this.enemySwarm = this.playerSwarm
+    } else {
+      this.enemyView = new ShipView(this, HUD.enemyShipRect, this.snap.enemy, {
+        facing: -1,
+        maxCell: 44,
+      })
+      const eb = this.enemyView.bubbleParams()
+      this.enemyBubble = new ShieldBubble(this, eb.cx, eb.cy, eb.rx, eb.ry)
+      // --- orbiting drones (combat orbits the foe; defense/repair orbit the owner) ---
+      this.playerSwarm = new DroneSwarm(this, this.playerView, this.enemyView, this.snap.you)
+      this.enemySwarm = new DroneSwarm(this, this.enemyView, this.playerView, this.snap.enemy)
+    }
 
     this.attachRoomTooltips(this.playerView, false)
-    this.attachRoomTooltips(this.enemyView, true)
+    if (!this.beacon) this.attachRoomTooltips(this.enemyView, true)
 
     // --- HUD widgets ---
     this.log = new CombatLog(this)
     this.readouts = new Readouts(this, audio)
-    // Expedition: scrap stash shown at the top of the vital-stats panel (FTL-style).
-    this.readouts.setScrap(this.start.mode === 'expedition' ? (this.store.run?.scrap ?? 0) : null)
-    this.enemyReadout = new EnemyReadout(this, this.snap.enemy)
+    // Expedition/beacon: scrap stash shown at the top of the vital-stats panel.
+    const showScrap = this.start.mode === 'expedition' || this.beacon
+    this.readouts.setScrap(showScrap ? (this.store.run?.scrap ?? 0) : null)
+    if (!this.beacon) this.enemyReadout = new EnemyReadout(this, this.snap.enemy)
     this.portraits = new CrewPortraits(this, this.snap.you.crew, {
       onSelect: (crewId) => this.targeting.selectCrew(crewId),
       onDeselect: () => this.targeting.clearSelection(),
@@ -192,16 +236,23 @@ export class BattleScene extends Phaser.Scene {
       {
         socket: this.net.socket,
         audio,
-        fleeTooltip:
-          this.start.mode === 'expedition'
+        beacon: this.beacon,
+        fleeTooltip: this.beacon
+          ? 'Saltar: revela el mapa de sector y eliges destino.\nEl salto se carga solo en unos segundos; puedes quedarte a reparar lo que quieras.'
+          : this.start.mode === 'expedition'
             ? 'Huir: pierdes el botín del nodo.\nEl salto se carga solo; para huir necesitas un tripulante en la sala de motores.'
             : this.start.mode === 'tutorial'
               ? 'Huir: termina la práctica.\nEl salto se carga solo; para huir necesitas un tripulante en la sala de motores.'
               : 'Huir: en Duelo cuenta como rendición.',
       },
       {
-        onSelectWeapon: (slot) => this.targeting.selectWeapon(slot),
-        onSlotRightClick: (slot) => this.targeting.onSlotRightClick(slot),
+        // No weapon targeting at a beacon (no enemy): the slots stay informational.
+        onSelectWeapon: (slot) => {
+          if (!this.beacon) this.targeting.selectWeapon(slot)
+        },
+        onSlotRightClick: (slot) => {
+          if (!this.beacon) this.targeting.onSlotRightClick(slot)
+        },
         onJumpClick: () => this.jumpClicked(),
         onAmmoDepleted: () => this.tutorial.notifyAmmoEmpty(),
       },
@@ -215,12 +266,14 @@ export class BattleScene extends Phaser.Scene {
       hud: this.hud,
       portraits: this.portraits,
       getYou: () => this.snap.you,
+      beacon: this.beacon,
     })
 
     this.router = new BattleEventRouter({
       scene: this,
       mySide: this.mySide,
       viewFor: (side) => (side === this.mySide ? this.playerView : this.enemyView),
+      droneSwarmFor: (side) => (side === this.mySide ? this.playerSwarm : this.enemySwarm),
       bubbleFor: (side) => (side === this.mySide ? this.playerBubble : this.enemyBubble),
       log: this.log,
       audio,
@@ -253,9 +306,11 @@ export class BattleScene extends Phaser.Scene {
       },
     )
     // Tutorial mode always shows the guide; an expedition shows it only once.
+    // Never at a beacon (no combat to coach).
     const showTutorial =
-      this.start.mode === 'tutorial' ||
-      (this.start.firstBattle && !this.store.settings.tutorialDone)
+      !this.beacon &&
+      (this.start.mode === 'tutorial' ||
+        (this.start.firstBattle && !this.store.settings.tutorialDone))
     if (showTutorial) {
       this.time.delayedCall(700, () => {
         if (this.ended) return
@@ -269,13 +324,44 @@ export class BattleScene extends Phaser.Scene {
       })
     }
 
+    // --- beacon: in-ship economy (repairs / upgrades / loot) ---
+    if (this.beacon) {
+      const econBtn = new Button(
+        this,
+        1060,
+        HUD.bottomBar.y + 62,
+        'MEJORAS',
+        () => this.openEconomy(),
+        { width: 184, height: 48, fontSize: 16 },
+      )
+      econBtn.setDepth(16)
+      // Keep the scrap readout and any open economy panel current after purchases
+      // (run:state while a Battle scene is active is relayed here as run:refresh).
+      scOn(this, 'run:refresh', () => {
+        this.readouts.setScrap(this.store.run?.scrap ?? 0)
+        this.economy?.refresh()
+      })
+      // Auto-open the panel when there's something to do here: a store or salvage.
+      const r = this.store.run
+      if (r && ((r.shopOffers?.length ?? 0) > 0 || r.lootWeapon !== null)) {
+        this.time.delayedCall(500, () => {
+          if (!this.ended) this.openEconomy()
+        })
+      }
+    }
+
     // --- CRT on top ---
     this.crt = new CrtOverlay(this)
     this.crt.setEnabled(this.store.settings.crtEnabled)
 
     // --- escape menu (pause + options + abandon) ---
-    const abandon =
-      this.start.mode === 'expedition'
+    const abandon = this.beacon
+      ? {
+          label: 'ABANDONAR',
+          confirm:
+            'Abandonas la expedición desde la baliza. Perderás todo el progreso, la chatarra y el botín.',
+        }
+      : this.start.mode === 'expedition'
         ? {
             label: 'ABANDONAR',
             confirm:
@@ -358,6 +444,23 @@ export class BattleScene extends Phaser.Scene {
     engage()
   }
 
+  /** Opens (or re-opens) the in-beacon economy panel. */
+  private openEconomy(): void {
+    if (this.economy) return
+    getAudio().play('click')
+    this.economy = openEconomyModal(this, {
+      getRun: () => this.store.run,
+      onBuy: (item) => {
+        getAudio().play('purchase')
+        this.net.socket.emit('run:buy', item)
+      },
+      onClose: () => {
+        this.economy?.close()
+        this.economy = undefined
+      },
+    })
+  }
+
   // -------------------------------------------------------------------------
   // Snapshot flow
   // -------------------------------------------------------------------------
@@ -369,9 +472,16 @@ export class BattleScene extends Phaser.Scene {
     }
     this.snap = snap
     this.playerView.apply(snap.you)
-    this.enemyView.apply(snap.enemy)
     this.playerBubble.setLayers(snap.you.shieldLayers, snap.you.shieldLayersMax)
-    this.enemyBubble.setLayers(snap.enemy.shieldLayers, snap.enemy.shieldLayersMax)
+    this.playerSwarm.apply(snap.you)
+    if (!this.beacon) {
+      // At a beacon enemyView/enemyBubble/enemySwarm are aliased to the player's own;
+      // never feed them the (dummy) enemy snapshot or it would corrupt the player view.
+      this.enemyView.apply(snap.enemy)
+      this.enemyBubble.setLayers(snap.enemy.shieldLayers, snap.enemy.shieldLayersMax)
+      this.enemySwarm.apply(snap.enemy)
+      this.enemyReadout?.apply(snap.enemy)
+    }
     // A regained shield layer plays a rising "charge" blip (once per layer gained).
     // Losses are handled event-side (shield_down sfx + bubble collapse flash), so
     // here we only react to GAINS to avoid doubling the drop feedback.
@@ -379,7 +489,6 @@ export class BattleScene extends Phaser.Scene {
     this.hud.apply(snap.you)
     this.portraits.apply(snap.you.crew)
     this.readouts.apply(snap.you)
-    this.enemyReadout.apply(snap.enemy)
     this.targeting.refresh(snap.you)
     // While the tutorial is up the auto-pause is implied by its own dim overlay,
     // so don't also show the PAUSA TÁCTICA banner (avoid stacking two "paused" cues).
@@ -397,6 +506,7 @@ export class BattleScene extends Phaser.Scene {
     }
     this.prevPlayerLayers = snap.you.shieldLayers
 
+    if (this.beacon) return // no enemy: don't blip the dummy ship's shield charge
     const enemyGain = snap.enemy.shieldLayers - this.prevEnemyLayers
     for (let i = 0; i < enemyGain; i++) {
       audio.play('shield_up', { volume: 0.32, detune: 200 + i * 120 })
@@ -495,7 +605,11 @@ export class BattleScene extends Phaser.Scene {
   override update(time: number, delta: number): void {
     if (!this.created) return
     this.playerView.update(time, delta)
-    this.enemyView.update(time, delta)
+    this.playerSwarm.update(time, delta, this.snap.paused)
+    if (!this.beacon) {
+      this.enemyView.update(time, delta)
+      this.enemySwarm.update(time, delta, this.snap.paused)
+    }
     this.hud.update(time, delta)
     this.portraits.update(time)
     this.readouts.update(time)
@@ -513,7 +627,7 @@ export class BattleScene extends Phaser.Scene {
       !this.ended &&
       !this.snap.paused &&
       (this.snap.you.crew.some((c) => c.hp > 0 && c.task === 'repair') ||
-        this.snap.enemy.crew.some((c) => c.hp > 0 && c.task === 'repair'))
+        (!this.beacon && this.snap.enemy.crew.some((c) => c.hp > 0 && c.task === 'repair')))
     if (!repairing) {
       this.repairSoundTimer = 0
       return
@@ -524,23 +638,30 @@ export class BattleScene extends Phaser.Scene {
       getAudio().play('repair', { volume: 0.55 })
       // Spark each repairing crew member in time with the "tock" so the sound reads.
       this.playerView.sparkRepairs()
-      this.enemyView.sparkRepairs()
+      if (!this.beacon) this.enemyView.sparkRepairs()
     }
   }
 
   private cleanup(): void {
+    this.economy?.close()
+    this.economy = undefined
     this.escapeMenu.destroy()
     this.targeting.destroy()
     this.tutorial.destroy()
     this.hud.destroy()
     this.portraits.destroy()
     this.readouts.destroy()
-    this.enemyReadout.destroy()
+    this.enemyReadout?.destroy()
     this.log.destroy()
     this.playerBubble.destroy()
-    this.enemyBubble.destroy()
+    this.playerSwarm.destroy()
     this.playerView.destroy()
-    this.enemyView.destroy()
+    // At a beacon the enemy refs are aliases of the player's own — already destroyed.
+    if (!this.beacon) {
+      this.enemyBubble.destroy()
+      this.enemySwarm.destroy()
+      this.enemyView.destroy()
+    }
     this.backdrop?.destroy()
     this.backdrop = null
     this.crt?.destroy()

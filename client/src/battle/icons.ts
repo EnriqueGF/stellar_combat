@@ -2,7 +2,7 @@
 // Every function draws centered at (cx, cy) with `s` as the full icon size.
 
 import type Phaser from 'phaser'
-import type { CrewTask, SystemId, WeaponCategory } from '@stellar/shared'
+import type { CrewTask, DroneDef, SystemId, WeaponCategory } from '@stellar/shared'
 import { COLORS } from '../theme'
 
 type G = Phaser.GameObjects.Graphics
@@ -227,6 +227,61 @@ export function drawScrapIcon(g: G, cx: number, cy: number, s: number, color: nu
   g.strokePath()
   g.lineStyle(Math.max(1, s * 0.09), color, 1)
   g.strokeCircle(cx, cy, r * 0.42)
+}
+
+/**
+ * Drone emblem by role (nose up), used in the HUD and to keep the in-world
+ * orbiting craft visually consistent. Three distinct silhouettes so the role
+ * reads from shape alone, never color: dart (offensive), hexagon (defensive),
+ * utility bot (internal/repair).
+ */
+export function drawDroneIcon(
+  g: G,
+  kind: DroneDef['kind'],
+  cx: number,
+  cy: number,
+  s: number,
+  color: number,
+): void {
+  const h = s / 2
+  g.fillStyle(color, 0.22)
+  g.lineStyle(1.5, color, 1)
+  if (kind === 'offensive') {
+    // Attack dart with a forward barrel.
+    g.beginPath()
+    g.moveTo(cx, cy - h)
+    g.lineTo(cx + h * 0.62, cy + h * 0.7)
+    g.lineTo(cx, cy + h * 0.32)
+    g.lineTo(cx - h * 0.62, cy + h * 0.7)
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+    g.fillStyle(color, 1)
+    g.fillRect(cx - s * 0.05, cy - h - s * 0.14, s * 0.1, s * 0.2)
+  } else if (kind === 'defensive') {
+    // Shield interceptor: a hexagon.
+    g.beginPath()
+    for (let k = 0; k < 6; k++) {
+      const a = (Math.PI / 3) * k - Math.PI / 6
+      const px = cx + Math.cos(a) * h * 0.92
+      const py = cy + Math.sin(a) * h * 0.92
+      if (k === 0) g.moveTo(px, py)
+      else g.lineTo(px, py)
+    }
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+  } else {
+    // Repair bot: a rounded chassis with a small antenna.
+    g.fillRoundedRect(cx - h * 0.72, cy - h * 0.5, h * 1.44, h * 1.2, 3)
+    g.strokeRoundedRect(cx - h * 0.72, cy - h * 0.5, h * 1.44, h * 1.2, 3)
+    g.lineBetween(cx, cy - h * 0.5, cx, cy - h)
+    g.fillStyle(color, 1)
+    g.fillCircle(cx, cy - h, s * 0.08)
+  }
+  // Bright core, shared by all roles.
+  g.fillStyle(color, 1)
+  g.fillCircle(cx, cy + (kind === 'offensive' ? h * 0.02 : 0), s * 0.11)
 }
 
 /** Hull: a delta-wing starship silhouette (nose up, notched tail). */
