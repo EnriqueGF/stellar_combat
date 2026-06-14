@@ -1,0 +1,83 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Stellar Combat" current="" lede="Combate táctico espacial 1v1 en tiempo real, en órbita de planetas procedurales. Inspirado en FTL: Faster Than Light.">
+  <Figure src="screenshots/menu.png" alt="Menú principal de Stellar Combat" caption="El menú principal, con un planeta procedural distinto en cada arranque." />
+
+  <p>
+    <strong>Stellar Combat</strong> es un juego de navegador en el que pilotas una nave espacial
+    sala a sala: repartes la energía del reactor entre tus sistemas, apuntas tus armas a las
+    salas concretas del enemigo, mueves a tu tripulación para reparar averías y apagar incendios,
+    y decides cuándo plantar cara y cuándo huir. El servidor simula la batalla a 20 ticks por
+    segundo y manda la verdad a tu cliente: nada de trampas, todo táctica.
+  </p>
+
+  <div class="rule">
+    <span class="e">Energía</span> funde escudos · <span class="k">Cinético</span> perfora cascos · <span class="x">Explosivo</span> revienta sistemas
+  </div>
+  <p class="c-dim" style="text-align:center;margin-top:-12px">
+    La regla de oro del combate. Si solo recuerdas una cosa, que sea esta.
+  </p>
+
+  <h2>¿Qué puedes hacer?</h2>
+  <div class="grid cols-3">
+    <div class="card accent-top">
+      <h3>Expedición</h3>
+      <p class="desc">Una <em>run</em> roguelite por un sector de 8 columnas: combates, élites, eventos
+        narrativos y tiendas, ganando chatarra y mejorando la nave hasta el jefe final.</p>
+      <a href={`${base}expedicion/`}>Leer más ▸</a>
+    </div>
+    <div class="card accent-top">
+      <h3>Duelo PvP</h3>
+      <p class="desc">1v1 en tiempo real contra otro jugador (o una IA equivalente), con loadouts de
+        presupuesto fijo. Sin pausa y con muerte súbita a los 5 minutos.</p>
+      <a href={`${base}modos/`}>Leer más ▸</a>
+    </div>
+    <div class="card accent-top">
+      <h3>Tutorial</h3>
+      <p class="desc">Un combate de práctica autocontenido contra el enemigo introductorio, con guía
+        paso a paso y pausa táctica. Repetible cuando quieras.</p>
+      <a href={`${base}modos/`}>Leer más ▸</a>
+    </div>
+  </div>
+
+  <h2>Cómo está organizada esta wiki</h2>
+  <p>Empieza por lo básico y profundiza a tu ritmo:</p>
+  <div class="grid cols-2">
+    <div class="panel">
+      <h3 style="margin-top:0">Para empezar a jugar</h3>
+      <ul>
+        <li><a href={`${base}como-jugar/`}>Cómo jugar</a> — controles, energía, apuntado, pausa y huida.</li>
+        <li><a href={`${base}modos/`}>Modos de juego</a> — Expedición, Duelo y Tutorial.</li>
+        <li><a href={`${base}naves/`}>Naves</a> — las tres naves jugables y el jefe.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Para dominar el combate</h3>
+      <ul>
+        <li><a href={`${base}combate/`}>Combate y daño</a> — el triángulo, escudos y evasión.</li>
+        <li><a href={`${base}armas/`}>Armas</a>, <a href={`${base}modulos/`}>módulos</a> y <a href={`${base}drones/`}>drones</a>.</li>
+        <li><a href={`${base}tripulacion/`}>Tripulación</a> y <a href={`${base}entorno/`}>entorno y peligros</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Un vistazo a la batalla</h2>
+  <Figure src="screenshots/battle.png" alt="Pantalla de batalla" caption="Tu nave a la izquierda, el enemigo a la derecha sobre su planeta, y la barra de control abajo." />
+  <p>
+    En la pantalla de batalla ves el corte transversal de ambas naves con sus salas, tripulantes,
+    escudos hexagonales e incendios. Abajo, la barra de control reúne el reactor, los siete sistemas,
+    tus armas con su recarga, los drones, los misiles y el cargador del salto. Todo es
+    <strong>procedural</strong>: planetas, naves, efectos y hasta la música se generan en el momento,
+    sin un solo sprite externo.
+  </p>
+
+  <div class="callout">
+    <span class="ctitle">Consejo</span>
+    <p>¿Es tu primera partida? Pulsa <strong>TUTORIAL</strong> en el menú: es un combate seguro, con
+      pausa y guía, contra el enemigo más débil del juego. Cuando le cojas el truco, lánzate a una
+      <a href={`${base}expedicion/`}>Expedición</a>.</p>
+  </div>
+</Layout>

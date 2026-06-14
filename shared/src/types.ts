@@ -32,6 +32,13 @@ export type DroneId = 'drone_combat' | 'drone_defense' | 'drone_repair'
 
 export type CrewClassId = 'pilot' | 'engineer' | 'gunner' | 'medic' | 'soldier'
 
+/** Crew species — an axis orthogonal to class: it sets the look and passive traits
+ *  (HP, walking speed, repair/firefighting skill, resistance to fire and vacuum). */
+export type CrewRaceId = 'human' | 'rockfolk' | 'synthetic' | 'mantid' | 'plasmid' | 'cryon'
+
+/** How the client draws a race token / portrait (procedural, no sprites). */
+export type CrewRaceShape = 'human' | 'rock' | 'synth' | 'mantid' | 'plasmid' | 'cryo'
+
 export type ShipClassId = 'sentinel' | 'vanguard' | 'bastion' | 'hegemon'
 
 export type PlanetBiome =
@@ -131,6 +138,32 @@ export interface CrewClassDef {
   fieldHeal: [number, number, number]
 }
 
+export interface CrewRaceDef {
+  id: CrewRaceId
+  name: string
+  /** Short flavour + trait summary shown in tooltips / loadout. */
+  desc: string
+  // --- visuals (plain hex, interpreted by the client renderer) ---
+  shape: CrewRaceShape
+  /** Body fill colour. */
+  color: number
+  /** Detail colour (eyes, facets, aura). */
+  accent: number
+  // --- passive trait multipliers (1 = baseline human) ---
+  /** Scales the class's max HP. */
+  hpMult: number
+  /** Walking speed between rooms. */
+  moveMult: number
+  /** System repair speed. */
+  repairMult: number
+  /** Firefighting speed (stacks with the soldier class bonus). */
+  fireFightMult: number
+  /** Fire damage taken while standing in flames (0 = immune). */
+  fireDamageMult: number
+  /** Suffocation damage taken in vacuum (0 = needs no oxygen). */
+  hypoxiaDamageMult: number
+}
+
 export interface RoomDef {
   id: number
   /** Grid position and size in cells (cell = abstract unit; client scales). */
@@ -175,6 +208,8 @@ export interface Loadout {
   drones: DroneId[]
   /** Exactly 4 entries; classes may repeat. */
   crew: CrewClassId[]
+  /** Optional species per crew slot (parallel to `crew`); absent = varied default. */
+  crewRaces?: CrewRaceId[]
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +260,7 @@ export interface CrewState {
   id: string
   name: string
   cls: CrewClassId
+  race: CrewRaceId
   level: 1 | 2 | 3
   xp: number
   hp: number
@@ -260,15 +296,19 @@ export interface DroneSlotState {
 }
 
 export interface JumpState {
-  charging: boolean
-  /** 0..1. */
+  /** 0..1; charges automatically from the start of combat while engines have power. */
   progress: number
-  /** Why the charge is currently blocked, for UI feedback. */
-  blocked: 'no_pilot' | 'no_engine_power' | null
+  /** Fully charged and ready to jump. */
+  ready: boolean
+  /** Why the jump can't proceed: engines unpowered (won't charge) or, once charged,
+   *  no crew member in the engine room to perform the jump. */
+  blocked: 'no_engine_power' | 'no_crew' | null
 }
 
 export interface ShipState {
   shipClass: ShipClassId
+  /** Ship/captain name (NPC template name or the player's captain name). */
+  name: string
   hull: number
   hullMax: number
   reactor: number
@@ -412,6 +452,12 @@ export interface GameEventDef {
   title: string
   text: string
   choices: EventChoiceDef[]
+  /** Pre-combat encounter: the client flags it as a hostile situation. */
+  combat?: boolean
+  /** Combat encounters only: the ship you are about to face (name + class), so the
+   *  client can always show who you have run into and that they are hostile. */
+  enemyName?: string
+  enemyClass?: string
 }
 
 export interface ShopOffer {
@@ -433,6 +479,9 @@ export interface RunUpgradeCosts {
 export interface RunStatePublic {
   sector: SectorMap
   currentNodeId: number
+  /** Node ids the player has discovered: visited nodes + their neighbours (scouted).
+   *  The client fogs every other node as an unexplored beacon ("?"). */
+  revealedNodeIds: number[]
   /** Columns cleared (difficulty). */
   column: number
   scrap: number
@@ -445,7 +494,7 @@ export interface RunStatePublic {
   weapons: WeaponId[]
   drones: DroneId[]
   defenseModule: DefenseModuleId
-  crew: { id: string; name: string; cls: CrewClassId; level: 1 | 2 | 3; xp: number; hp: number; hpMax: number }[]
+  crew: { id: string; name: string; cls: CrewClassId; race: CrewRaceId; level: 1 | 2 | 3; xp: number; hp: number; hpMax: number }[]
   upgradeCosts: RunUpgradeCosts
   /** Weapon offered as loot after last battle, purchasable on upgrade screen. */
   lootWeapon: WeaponId | null
@@ -455,6 +504,8 @@ export interface RunStatePublic {
   event: GameEventDef | null
   /** Set after resolving an event choice. */
   eventResult: string | null
+  /** Resource changes from the last resolved event, for clear visual feedback. */
+  eventDelta: { scrap: number; hull: number; ammo: number } | null
   alive: boolean
   victory: boolean
 }

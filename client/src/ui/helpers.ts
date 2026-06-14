@@ -34,6 +34,7 @@ import {
   installResponsiveCamera,
 } from '../theme'
 import type { ICrtOverlay, ISpaceBackdrop } from '../contracts'
+import { drawHullIcon, drawMissileIcon, drawScrapIcon } from '../battle/icons'
 import { SpaceBackdrop } from '../vfx/backdrop'
 import { CrtOverlay } from '../vfx/crt'
 import { getState } from '../state'
@@ -210,32 +211,24 @@ export function buildRunHeader(scene: Phaser.Scene, run: RunStatePublic): Phaser
     c.add(scene.add.text(lx, 22, str, textStyle('body', 16, color)).setOrigin(0, 0.5))
   }
 
-  // Scrap: amber hexagon.
-  icon(28, (g) => {
-    g.lineStyle(2, COLORS.warn, 1)
-    const pts: Phaser.Math.Vector2[] = []
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i - Math.PI / 6
-      pts.push(new Phaser.Math.Vector2(Math.cos(a) * 8, Math.sin(a) * 8))
-    }
-    g.strokePoints(pts, true)
-  })
-  label(44, `CHATARRA ${Math.round(run.scrap)}`, COLORS.warn)
+  // Scrap: amber hex nut + emphasised amount (the key run resource).
+  icon(30, (g) => drawScrapIcon(g, 0, 0, 20, COLORS.warn))
+  const amount = scene.add
+    .text(48, 22, `${Math.round(run.scrap)}`, textStyle('title', 20, COLORS.warn))
+    .setOrigin(0, 0.5)
+  c.add(amount)
+  c.add(
+    scene.add
+      .text(48 + amount.width + 8, 24, 'CHATARRA', textStyle('body', 12, COLORS.textDim))
+      .setOrigin(0, 0.5),
+  )
 
-  // Hull: green square with cross.
-  icon(268, (g) => {
-    g.lineStyle(2, COLORS.ok, 1)
-    g.strokeRect(-8, -8, 16, 16)
-    g.lineBetween(-4, 0, 4, 0)
-    g.lineBetween(0, -4, 0, 4)
-  })
+  // Hull: ship silhouette.
+  icon(268, (g) => drawHullIcon(g, 0, 0, 18, COLORS.ok))
   label(284, `CASCO ${Math.round(run.hull)}/${run.hullMax}`, COLORS.ok)
 
-  // Ammo: red triangle (missiles).
-  icon(508, (g) => {
-    g.lineStyle(2, COLORS.catExplosive, 1)
-    g.strokeTriangleShape(new Phaser.Geom.Triangle(-7, 8, 7, 8, 0, -8))
-  })
+  // Ammo: missile icon.
+  icon(508, (g) => drawMissileIcon(g, 0, 0, 18, COLORS.catExplosive, false))
   label(524, `MISILES ${run.ammo}`, COLORS.catExplosive)
 
   label(700, `COLUMNA ${run.column}/8`, COLORS.text)

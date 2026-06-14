@@ -1,0 +1,108 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Cómo jugar" current="como-jugar/" lede="Lo esencial para entrar en combate: energía, apuntado, tripulación, compuertas, pausa y huida.">
+  <p>
+    Stellar Combat se juega con el ratón para casi todo y unas pocas teclas. No controlas la nave
+    «volando»: la nave se mueve sola en órbita. Tú gestionas sus <strong>sistemas</strong>, sus
+    <strong>armas</strong> y su <strong>tripulación</strong> en tiempo real (o en pausa, contra la IA).
+  </p>
+
+  <h2>Controles</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tecla / acción</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Selecciona un arma; luego haz clic en una sala enemiga para fijar el objetivo.</td></tr>
+        <tr><td>Clic izq. en un sistema</td><td>Añade <strong>+1</strong> de energía a ese sistema (barra inferior).</td></tr>
+        <tr><td>Clic dcho. / rueda abajo en un sistema</td><td>Quita <strong>−1</strong> de energía.</td></tr>
+        <tr><td>Clic dcho. (con un arma elegida)</td><td>Cancela el arma/objetivo seleccionado.</td></tr>
+        <tr><td>Clic izq. en un tripulante · arrastrar</td><td>Selecciona uno o varios tripulantes (clic en zona vacía deselecciona).</td></tr>
+        <tr><td><strong>Clic dcho.</strong> en una sala</td><td>Envía allí a los tripulantes seleccionados.</td></tr>
+        <tr><td>Clic en una compuerta</td><td>Abre o cierra esa puerta (repartir O₂ / aislar una sala).</td></tr>
+        <tr><td><kbd>Espacio</kbd></td><td>Pausa táctica (solo contra la IA).</td></tr>
+        <tr><td><kbd>J</kbd></td><td>Saltar y huir (el salto se carga solo; pierdes el botín del nodo).</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Abre el menú: reanudar · opciones · cómo jugar · abandonar.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">
+    Todo elemento de la interfaz tiene un <em>tooltip</em> al pasar el ratón por encima (≈0,3 s),
+    incluido el triángulo de categorías en cada arma. Ninguna señal importante depende solo del
+    color: siempre hay forma, icono y texto.
+  </p>
+
+  <h2>1 · Reparte la energía</h2>
+  <p>
+    El <strong>reactor</strong> produce energía; tú la repartes en vivo entre los siete sistemas desde
+    la barra inferior. <strong>Clic izquierdo</strong> sobre un sistema le da una barra de energía;
+    <strong>clic derecho</strong> se la quita. Un sistema sin energía no funciona: sin
+    <a href={`${base}sistemas/`}>armas</a> alimentadas no cargan los cañones, sin escudos no hay burbuja,
+    sin motores no hay evasión ni salto.
+  </p>
+  <div class="callout">
+    <span class="ctitle">Clave</span>
+    <p>Casi siempre tendrás <strong>menos energía que sistemas que alimentar</strong>. Priorizar es el
+      corazón del juego: ¿más escudos para aguantar, o más armas para rematar antes?</p>
+  </div>
+
+  <h2>2 · Apunta tus armas</h2>
+  <Figure src="screenshots/battle.png" alt="Apuntando un arma a la nave enemiga" caption="Selecciona un arma (clic o teclas 1–4) y haz clic en la sala enemiga que quieras castigar." />
+  <p>
+    Selecciona un arma con las teclas <kbd>1</kbd>–<kbd>4</kbd> o haciendo clic en su slot. Aparece una
+    mira sobre la nave enemiga: haz clic en la <strong>sala</strong> que quieras atacar para fijarla.
+    Cada línea de objetivo lleva el número de slot y un trazo distinto según la categoría del arma. El
+    <strong>clic derecho</strong> cancela. Activa el <strong>autofuego</strong> (Ⓐ) en un arma para que
+    repita sola sobre el último objetivo.
+  </p>
+  <p>
+    ¿A qué sala disparar? Depende de tu plan: a <strong>pilotaje/cabina</strong> para anular su evasión,
+    a <strong>armas</strong> para que dejen de disparar, a <strong>escudos</strong> para abrir brecha en
+    su defensa, o directo al <strong>casco</strong> para acabar. Lee <a href={`${base}combate/`}>Combate y daño</a>.
+  </p>
+
+  <h2>3 · Mueve a tu tripulación</h2>
+  <p>
+    Tus 4 tripulantes reparan sistemas, apagan incendios, sellan brechas y potencian salas cuando las
+    tripulan. <strong>Clic izquierdo</strong> para seleccionar (arrastra para elegir a varios) y
+    <strong>clic derecho</strong> en una sala para mandarlos allí. Caminan <em>por las puertas</em>, no
+    saltan en diagonal, así que una sala aislada queda incomunicada.
+  </p>
+  <p>
+    Si no les das órdenes, se ocupan solos con esta prioridad: <strong>Fuego → Brecha → Reparar →
+    Operar</strong>, y si no hay nada que hacer vuelven a su puesto asignado. Aprende quién hace mejor
+    cada cosa en <a href={`${base}tripulacion/`}>Tripulación y razas</a>.
+  </p>
+
+  <h2>4 · Gestiona las compuertas</h2>
+  <p>
+    Cada puerta del plano puede abrirse o cerrarse con un clic. Las naves <strong>arrancan selladas</strong>
+    (puertas cerradas). Ábrelas para que el oxígeno se reparta por la nave; ciérralas para
+    <strong>aislar una sala</strong>: si dentro hay un incendio, sin oxígeno nuevo se consume el que queda
+    y el fuego <em>se asfixia</em> (a costa de que tu tripulante de ahí también necesite aire). Es la
+    misma táctica que usa la IA enemiga. Detalles en <a href={`${base}entorno/`}>Entorno y peligros</a>.
+  </p>
+
+  <h2>5 · Pausa táctica</h2>
+  <p>
+    Contra la IA (Expedición, Duelo-vs-NPC o Tutorial) puedes pulsar <kbd>Espacio</kbd> para
+    <strong>pausar</strong> la simulación: apunta con calma, redistribuye energía y da órdenes con el
+    tiempo parado. Aparece un indicador <strong>PAUSA</strong>. Abrir el menú con <kbd>Esc</kbd> también
+    pausa. En el <a href={`${base}modos/`}>Duelo PvP</a> no hay pausa.
+  </p>
+
+  <h2>6 · Huir (el salto FTL)</h2>
+  <p>
+    Si la cosa se tuerce, puedes <strong>huir</strong>. El motor de salto se carga solo desde el inicio
+    del combate, siempre que los <strong>motores tengan energía</strong>; para ejecutarlo necesitas un
+    <strong>tripulante en la cabina/motores</strong>. La carga es lenta y deliberada: no puedes saltar de
+    cualquier apuro. Pulsa <kbd>J</kbd> cuando esté listo.
+  </p>
+  <div class="callout gold">
+    <span class="ctitle">Cuidado</span>
+    <p>Huir te saca del combate pero <strong>pierdes el botín del nodo</strong>. En Duelo, huir cuenta
+      como <strong>rendición</strong> (derrota).</p>
+  </div>
+</Layout>

@@ -2,6 +2,7 @@
 
 import {
   BREACH_O2_DRAIN,
+  CREW_RACES,
   FIRE_CREW_DPS,
   FIRE_INTENSITY_ON_HIT,
   FIRE_MIN_O2,
@@ -70,7 +71,9 @@ export function tickEnvironment(ctx: BattleCtx, side: Side, dt: number): void {
       room.o2 -= FIRE_O2_BURN * dt
       damageSystem(ctx, side, room.id, FIRE_SYSTEM_DPS * dt)
       for (const crew of ship.crew) {
-        if (crew.roomId === room.id) crew.hp -= FIRE_CREW_DPS * dt
+        if (crew.roomId === room.id) {
+          crew.hp -= FIRE_CREW_DPS * dt * (CREW_RACES[crew.race]?.fireDamageMult ?? 1)
+        }
       }
       if (room.o2 < FIRE_MIN_O2) room.fire -= FIRE_SUFFOCATE_RATE * dt
     }
@@ -80,10 +83,12 @@ export function tickEnvironment(ctx: BattleCtx, side: Side, dt: number): void {
     room.breach = clamp(room.breach, 0, 100)
   }
 
-  // Hypoxia.
+  // Hypoxia (synthetics need no oxygen; some species resist the vacuum).
   for (const crew of ship.crew) {
     const room = roomById(ship, crew.roomId)
-    if (room && room.o2 < O2_HYPOXIA_THRESHOLD) crew.hp -= O2_HYPOXIA_DPS * dt
+    if (room && room.o2 < O2_HYPOXIA_THRESHOLD) {
+      crew.hp -= O2_HYPOXIA_DPS * dt * (CREW_RACES[crew.race]?.hypoxiaDamageMult ?? 1)
+    }
   }
 
   // Fire spread, evaluated on a fixed period per ship. Fire only jumps through

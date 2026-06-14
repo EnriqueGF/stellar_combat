@@ -10,6 +10,7 @@ import { addText } from '../ui/helpers'
 import { getNet, installRouting } from '../net/socket'
 import { getState } from '../state'
 import { getAudio } from '../audio/engine'
+import { fadeInScene } from '../ui/transition'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -38,6 +39,12 @@ export class BootScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     })
+    // Fade the splash up from black. Boot's EXIT stays an instant scene.start
+    // (below): it races the global resume-routing (run:state/battle:start can
+    // fire within the 150ms window), and a fade-out would set the transition
+    // guard and block that routing. MainMenu/SectorMap/Battle fade in on their
+    // own create(), so the hop still looks smooth.
+    fadeInScene(this)
 
     void getNet()
       .ready()

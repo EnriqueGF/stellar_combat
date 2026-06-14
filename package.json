@@ -6,11 +6,13 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "wiki"
   ],
   "scripts": {
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w @stellar/server\" \"npm run dev -w @stellar/client\"",
-    "build": "npm run build -w @stellar/client",
+    "build": "npm run build:wiki && npm run build -w @stellar/client",
+    "build:wiki": "npm run build -w @stellar/wiki",
     "start": "npm run start -w @stellar/server",
     "test": "npm run test -w @stellar/server",
     "typecheck": "tsc -p shared --noEmit && tsc -p server --noEmit && tsc -p client --noEmit"

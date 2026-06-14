@@ -30,6 +30,8 @@ export interface BattleHostConfig {
   seed: number
   backdropSeed: number
   firstBattle: boolean
+  /** Opening combat-log line (encounter flavour); emitted once the battle is live. */
+  introLog?: string
   /** Called once, after battle:end has been emitted to both seats. */
   onEnd: (result: BattleResult, sim: IBattleSim) => void
 }
@@ -48,6 +50,9 @@ export class BattleHost {
   private timer: NodeJS.Timeout | null = null
   private loopCount = 0
   private ended = false
+  /** Pending opening log line; flushed on the first loop so the client (whose Battle
+   *  scene subscribes a frame after battle:start) is already listening. */
+  private introLog: string | null
 
   constructor(
     setupA: ShipSetup,
@@ -62,6 +67,7 @@ export class BattleHost {
     })
     this.sim = sim
     this.seats = { a: this.makeSeat('a', players.a), b: this.makeSeat('b', players.b) }
+    this.introLog = config.introLog ?? null
   }
 
   private makeSeat(side: Side, player: Player | null): Seat {
@@ -98,6 +104,12 @@ export class BattleHost {
   // ---------------------------------------------------------------------------
 
   private loop(): void {
+    // Flush the opening flavour line on the first loop (the client is now listening).
+    if (this.introLog !== null) {
+      const msg = this.introLog
+      this.introLog = null
+      this.broadcastEvents([{ t: 'log', msg }])
+    }
     this.loopCount += 1
     if (!this.sim.paused && this.sim.result === null) {
       this.sim.tick()
@@ -182,8 +194,8 @@ export class BattleHost {
     this.sim.toggleDoor(side, doorId)
   }
 
-  setJumpCharging(side: Side, charging: boolean): void {
-    this.sim.setJumpCharging(side, charging)
+  requestJump(side: Side): void {
+    this.sim.requestJump(side)
   }
 
   surrender(side: Side): void {

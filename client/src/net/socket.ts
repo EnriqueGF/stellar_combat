@@ -47,13 +47,15 @@
 
 import Phaser from 'phaser'
 import { io } from 'socket.io-client'
-import type { BattleResult, Side } from '@stellar/shared'
+import type { AuthResult, BattleResult, Side } from '@stellar/shared'
 import type { BattleSceneData, Net, ResultSceneData, SceneKey, TypedSocket } from '../contracts'
 import { getState } from '../state'
 import { Toast } from '../ui/toast'
 import { getAudio } from '../audio/engine'
+import { routeToScene } from '../ui/transition'
 
 const TOKEN_KEY = 'sc_token'
+const AUTH_KEY = 'sc_auth'
 
 /** Local event bus connecting net routing with whichever scene is active. */
 export const sc = new Phaser.Events.EventEmitter()
@@ -86,6 +88,47 @@ function writeToken(token: string): void {
   }
 }
 
+export function readAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_KEY)
+  } catch {
+    return null
+  }
+}
+
+function writeAuthToken(token: string): void {
+  try {
+    localStorage.setItem(AUTH_KEY, token)
+  } catch {
+    // Private mode: the account just won't persist across reloads.
+  }
+}
+
+function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(AUTH_KEY)
+  } catch {
+    // Nothing to do.
+  }
+}
+
+/** Stores a successful auth result and notifies the menu via the 'sc' bus. */
+export function applyAuthResult(res: AuthResult): void {
+  if (res.ok && res.profile) {
+    getState().profile = res.profile
+    if (res.token) writeAuthToken(res.token)
+  }
+  sc.emit('auth')
+}
+
+/** Signs out: drops the account link locally and on the server. */
+export function logoutAccount(): void {
+  getNet().socket.emit('auth:logout')
+  clearAuthToken()
+  getState().profile = null
+  sc.emit('auth')
+}
+
 class NetImpl implements Net {
   readonly socket: TypedSocket
   private readonly readyPromise: Promise<void>
@@ -114,6 +157,20 @@ class NetImpl implements Net {
     this.socket.emit('session:hello', readToken(), (token: string) => {
       writeToken(token)
       this.socket.emit('lobby:subscribe')
+      // Re-link a stored account (survives server restarts: the session token does not).
+      const auth = readAuthToken()
+      if (auth) {
+        this.socket.emit('auth:resume', auth, (res: AuthResult) => {
+          if (res.ok) {
+            applyAuthResult(res)
+          } else {
+            // Stored token no longer valid (e.g. account file reset): drop it.
+            clearAuthToken()
+            getState().profile = null
+            sc.emit('auth')
+          }
+        })
+      }
       if (this.resolveReady) {
         this.resolveReady()
         this.resolveReady = null
@@ -154,12 +211,13 @@ function isActive(game: Phaser.Game, key: SceneKey): boolean {
   return game.scene.getScenes(true).some((s) => s.scene.key === key)
 }
 
-/** Stops every active scene and starts `key` fresh with the given data. */
+/** Stops every active scene and starts `key` fresh, fading the active scene out
+ *  first (see ui/transition.routeToScene). The fade-out/stop-all/start sequence
+ *  preserves the previous instant semantics — nothing ends up stacked — while
+ *  adding the cross-fade. Re-entrant calls during a fade are ignored by the
+ *  transition guard, so a burst of routing events can't double-start a scene. */
 function startScene(game: Phaser.Game, key: SceneKey, data?: object): void {
-  for (const s of game.scene.getScenes(true)) {
-    s.scene.stop()
-  }
-  game.scene.start(key, data)
+  routeToScene(game, key, data)
 }
 
 function buildResultData(result: BattleResult, yourSide: Side): ResultSceneData {

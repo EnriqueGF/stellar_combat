@@ -1,0 +1,91 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Entorno y peligros" current="entorno/" lede="El interior de la nave es un mundo vivo: oxígeno que circula, incendios que se propagan, brechas que succionan el aire y compuertas con las que lo controlas todo.">
+  <p>
+    Buena parte del combate ocurre <em>dentro</em> de tu nave. Saber gestionar el oxígeno, el fuego y las
+    brechas —y, sobre todo, las puertas— separa a un capitán que sobrevive de uno que pierde la tripulación
+    a media batalla. Es la herencia más pura de FTL.
+  </p>
+
+  <h2>Compuertas: tu mando maestro</h2>
+  <p>
+    Cada puerta del plano se abre o cierra con un clic. Las naves <strong>arrancan selladas</strong> (todas
+    las puertas cerradas). Una puerta <strong>cerrada</strong> bloquea dos cosas: la difusión de oxígeno y
+    la propagación del fuego.
+  </p>
+  <ul>
+    <li><strong>Abrir</strong> puertas reparte el oxígeno por la nave y deja pasar a la tripulación.</li>
+    <li><strong>Aislar una sala</strong> (cerrar todas sus puertas) la corta del suministro: el oxígeno deja
+      de rellenarla. Si dentro arde un incendio, consume el aire que queda y <strong>se asfixia solo</strong>,
+      sin saltar a las salas vecinas.</li>
+  </ul>
+  <div class="callout">
+    <span class="ctitle">La maniobra clásica</span>
+    <p>¿Un incendio fuera de control? Saca a tu gente, <strong>cierra todas las puertas de esa sala</strong> y
+      deja que el fuego se ahogue por falta de oxígeno. Luego reabre y repara. La IA enemiga hace exactamente
+      lo mismo con sus salas en llamas, así que apuntar fuego a una sala que el rival puede sellar no siempre
+      compensa.</p>
+  </div>
+
+  <h2>Oxígeno (O₂)</h2>
+  <p>Cada sala tiene un nivel de oxígeno de 0 a 100. El <a href={`${base}sistemas/`}>sistema de oxígeno</a>
+    alimentado rellena toda la nave; el aire se iguala entre salas conectadas por puertas abiertas.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Efecto</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Relleno con oxígeno alimentado</td><td>+1,2%/s por nivel del sistema (toda la nave)</td></tr>
+        <tr><td>Caída sin energía en oxígeno</td><td>−0,6%/s en toda la nave</td></tr>
+        <tr><td>Difusión entre salas (puerta abierta)</td><td>iguala niveles a 4%/s por puerta</td></tr>
+        <tr><td>Asfixia de la tripulación</td><td>con O₂ &lt; 15%, pierden 4 HP/s</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Algunas especies aguantan mejor el vacío: el <a href={`${base}tripulacion/`}>Autómata</a> es
+    inmune a la asfixia y el Glacial o el Plasmoide la sufren poco.</p>
+
+  <h2>Fuego</h2>
+  <p>El fuego (0–100 por sala) es el peligro interno más temido: daña el sistema, hiere a la tripulación,
+    consume oxígeno y se propaga.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Efecto</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Daño al sistema de la sala</td><td>0,5/s</td></tr>
+        <tr><td>Daño a la tripulación presente</td><td>5 HP/s</td></tr>
+        <tr><td>Oxígeno consumido</td><td>1,5%/s en la sala</td></tr>
+        <tr><td>Se extingue solo</td><td>con O₂ &lt; 20%</td></tr>
+        <tr><td>Propagación a salas vecinas</td><td>cada 5 s, por puertas abiertas (≈20% de prob.)</td></tr>
+        <tr><td>Lo combate un tripulante</td><td>−10%/s (más con Soldado y especies «bomberas»)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Tienes dos formas de combatirlo: <strong>con tripulación</strong> (manda gente a apagarlo) o
+    <strong>asfixiándolo</strong> (cierra las puertas de la sala para que se quede sin aire). A menudo lo
+    mejor es combinar ambas.</p>
+
+  <h2>Brecha</h2>
+  <p>Una brecha (0–100) es un agujero en el casco de una sala. No quema, pero <strong>succiona el oxígeno</strong>
+    y, mientras exista, <strong>impide reparar el sistema de esa sala</strong>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Efecto</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Oxígeno drenado de la sala</td><td>3%/s</td></tr>
+        <tr><td>La sella un tripulante</td><td>−8%/s</td></tr>
+        <tr><td>Mientras haya brecha</td><td>el sistema de la sala no puede repararse</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Las armas con probabilidad de brecha (Cañón Gauss, Magnetocañón, Misil Brecha…) son ideales
+    para inutilizar un sistema enemigo: primero brecha (no lo pueden reparar), luego lo machacas.</p>
+
+  <div class="callout gold">
+    <span class="ctitle">Prioriza la respuesta</span>
+    <p>Si te entran fuego y brecha a la vez, recuerda la prioridad automática de la tripulación:
+      <strong>Fuego → Brecha → Reparar → Operar</strong>. El fuego mata gente y sistemas rápido; la brecha
+      «solo» drena aire y bloquea reparaciones. Apaga primero, sella después.</p>
+  </div>
+</Layout>

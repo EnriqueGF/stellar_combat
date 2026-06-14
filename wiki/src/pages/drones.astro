@@ -1,0 +1,55 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Drones" current="drones/" lede="Pequeños auxiliares automáticos. Equipas hasta 3 (sin repetir) y activas tantos como nivel tenga tu bahía de drones.">
+  <p>
+    Los drones trabajan solos una vez activos: no hay que apuntarlos ni moverlos. Cada uno cuesta
+    <strong>1 punto</strong> de presupuesto y consume energía de la <a href={`${base}sistemas/`}>bahía de
+    drones</a> mientras está activo. Puedes <strong>equipar hasta 3</strong> distintos, pero solo estarán
+    activos a la vez tantos como nivel alimentado tenga la bahía (máx. 2 simultáneos en el MVP). No se
+    pueden duplicar.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Dron</th><th>Tipo</th><th class="num">Energía</th><th class="num">Cadencia</th><th>Función</th></tr></thead>
+      <tbody>
+        <tr><td>Dron de Combate</td><td class="c-warn">Ofensivo</td><td class="num">2</td><td class="num">7 s</td><td>Dispara 1 de daño Energía a una sala enemiga aleatoria.</td></tr>
+        <tr><td>Dron de Defensa</td><td class="c-shield">Defensivo</td><td class="num">1</td><td class="num">3 s</td><td>60% de derribar un proyectil entrante (las salvas lo saturan).</td></tr>
+        <tr><td>Dron de Reparación</td><td class="c-ok">Interno</td><td class="num">1</td><td class="num">5 s</td><td>Repara el sistema más dañado de tu nave.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid cols-3">
+    <div class="card" style="border-top:3px solid var(--cat-kinetic)">
+      <h3>Dron de Combate</h3>
+      <p class="sub">Ofensivo · 2 energía</p>
+      <p class="desc">Orbita al enemigo y le lanza un láser (1 de daño <span class="c-energy">Energía</span>)
+        a una sala aleatoria cada 7 s. Daño extra «gratis» que no depende de tu apuntado ni de tu munición.</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--shield)">
+      <h3>Dron de Defensa</h3>
+      <p class="sub">Defensivo · 1 energía</p>
+      <p class="desc">Intenta derribar proyectiles entrantes con un 60% de acierto, pero necesita
+        <strong>3 s entre intentos</strong>: una andanada de varios disparos lo satura. Combínalo con la
+        <a href={`${base}modulos/`}>Defensa Puntual</a> contra rivales de mucho misil.</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--ok)">
+      <h3>Dron de Reparación</h3>
+      <p class="sub">Interno · 1 energía</p>
+      <p class="desc">Repara automáticamente 1 punto del sistema más dañado cada 5 s. Libera a tu
+        tripulación para apagar fuegos o tripular puestos en vez de andar reparando.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="ctitle">Equipar vs. activar</span>
+    <p>Llevar 3 drones no significa tenerlos los 3 funcionando: cada dron activo gasta una ranura de la
+      bahía de drones, y la bahía da una ranura por nivel alimentado. Sube el nivel de la bahía (y
+      aliméntala) para tener más drones a la vez.</p>
+  </div>
+
+  <p class="c-dim">Los drones anti-personal, de escudo y de abordaje quedan fuera de esta versión (MVP).</p>
+</Layout>

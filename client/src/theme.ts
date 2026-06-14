@@ -103,10 +103,12 @@ export function installResponsiveCamera(
 /** GAME_SPEC §6.3 — fixed HUD zones for the Battle scene (pixels, 1280×720). */
 export const HUD = {
   logRect: { x: 340, y: 4, w: 600, h: 52 },
-  portraitsRect: { x: 0, y: 90, w: 86, h: 390 },
+  // FTL-style left column: vital stats (hull/evasion/shields/O2 + supplies) stacked at
+  // the top, crew portraits below.
+  readoutsRect: { x: 8, y: 6, w: 178, h: 124 },
+  portraitsRect: { x: 4, y: 134, w: 86, h: 170 },
   playerShipRect: { x: 96, y: 110, w: 460, h: 450 },
   enemyShipRect: { x: 720, y: 90, w: 460, h: 380 },
-  readoutsRect: { x: 96, y: 64, w: 460, h: 40 },
   bottomBar: { y: 585, h: 135 },
 } as const
 

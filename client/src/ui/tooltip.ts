@@ -20,6 +20,37 @@ import { textStyle } from './helpers'
 const SHOW_DELAY_MS = 300
 const DEPTH = 10001
 const WRAP_WIDTH = 320
+const PAD = 10
+const GAP = 3
+
+/**
+ * Per-line role used to colour the body of a tooltip. Tooltips are plain strings
+ * (first line = title); body lines are classified by content so the renderer can
+ * give them distinctive colours without every call site needing markup:
+ *  - hint:    interaction help ("Clic …", "[J] …")          → dim
+ *  - warn:    danger/penalty lines ("Sin energía", "A 0 …")  → amber
+ *  - kv:      "Etiqueta: valor"                              → dim label + bright value
+ *  - plain:   anything else                                  → body text
+ */
+type LineRole =
+  | { kind: 'hint' }
+  | { kind: 'warn' }
+  | { kind: 'kv'; label: string; value: string }
+  | { kind: 'plain' }
+
+const HINT_RE = /^(clic|click|\[|atajos|rueda|espacio|tecla|a:|j:)/i
+const WARN_RE =
+  /(destruid|muert|asfixi|sin energía|sin energia|sin munici|insuficiente|^a 0|⚠|peligro|crític|critic)/i
+const KV_RE = /^([\wÁÉÍÓÚÜÑáéíóúüñ .]{1,18}):\s+(.+)$/
+
+function classify(line: string): LineRole {
+  const trimmed = line.trim()
+  if (HINT_RE.test(trimmed)) return { kind: 'hint' }
+  if (WARN_RE.test(line)) return { kind: 'warn' }
+  const m = KV_RE.exec(trimmed)
+  if (m && m[1] !== undefined && m[2] !== undefined) return { kind: 'kv', label: m[1], value: m[2] }
+  return { kind: 'plain' }
+}
 
 interface Shown {
   container: Phaser.GameObjects.Container
@@ -53,17 +84,72 @@ function show(obj: Phaser.GameObjects.GameObject, textFn: () => string): void {
   const text = textFn()
   if (text === '') return
   const scene = obj.scene
-  const label = scene.add.text(10, 8, text, {
-    ...textStyle('body', 14),
-    wordWrap: { width: WRAP_WIDTH },
-  })
-  const w = label.width + 20
-  const h = label.height + 16
+
+  const fullWrap = WRAP_WIDTH - PAD * 2
+  const parts: Phaser.GameObjects.Text[] = []
+  let maxRight = 0
+  let cy = PAD
+  const put = (
+    px: number,
+    str: string,
+    kind: 'title' | 'body',
+    size: number,
+    color: number,
+    wrapW?: number,
+  ): Phaser.GameObjects.Text => {
+    const t = scene.add.text(px, cy, str, {
+      ...textStyle(kind, size, color),
+      ...(wrapW !== undefined ? { wordWrap: { width: wrapW } } : {}),
+    })
+    parts.push(t)
+    maxRight = Math.max(maxRight, px + t.width)
+    return t
+  }
+
+  const lines = text.split('\n')
+  const title = lines[0] ?? ''
+  const dash = title.indexOf(' — ')
+  if (dash >= 0) {
+    const name = put(PAD, title.slice(0, dash), 'title', 14, COLORS.panelBorder)
+    put(PAD + name.width, title.slice(dash), 'body', 13, COLORS.textDim, fullWrap - name.width)
+    cy += name.height + GAP
+  } else {
+    const t = put(PAD, title, 'title', 14, COLORS.panelBorder, fullWrap)
+    cy += t.height + GAP
+  }
+
+  const dividerY = cy + 1
+  cy += 7
+
+  for (const line of lines.slice(1)) {
+    if (line.trim() === '') {
+      cy += 5
+      continue
+    }
+    const role = classify(line)
+    if (role.kind === 'kv') {
+      const lbl = put(PAD, `${role.label}: `, 'body', 13, COLORS.textDim)
+      const val = put(PAD + lbl.width, role.value, 'body', 13, COLORS.text, fullWrap - lbl.width)
+      cy += Math.max(lbl.height, val.height) + GAP
+    } else {
+      const color =
+        role.kind === 'hint' ? COLORS.textDim : role.kind === 'warn' ? COLORS.warn : COLORS.text
+      const t = put(PAD, line, 'body', 13, color, fullWrap)
+      cy += t.height + GAP
+    }
+  }
+
+  const w = maxRight + PAD
+  const h = cy - GAP + PAD
   const bg = scene.add.graphics()
-  bg.fillStyle(COLORS.panel, 0.96)
-  bg.fillRoundedRect(0, 0, w, h, 5)
+  bg.fillStyle(COLORS.panel, 0.97)
+  bg.fillRoundedRect(0, 0, w, h, 6)
   bg.lineStyle(1, COLORS.panelBorder, 0.9)
-  bg.strokeRoundedRect(0, 0, w, h, 5)
+  bg.strokeRoundedRect(0, 0, w, h, 6)
+  if (lines.length > 1) {
+    bg.lineStyle(1, COLORS.panelBorder, 0.3)
+    bg.lineBetween(PAD, dividerY, w - PAD, dividerY)
+  }
 
   const pointer = scene.input.activePointer
   let x = pointer.worldX + 14
@@ -73,7 +159,7 @@ function show(obj: Phaser.GameObjects.GameObject, textFn: () => string): void {
   if (y + h > GAME_HEIGHT - 8) y = pointer.worldY - h - 12
   if (y < 8) y = 8
 
-  const container = scene.add.container(x, y, [bg, label]).setDepth(DEPTH)
+  const container = scene.add.container(x, y, [bg, ...parts]).setDepth(DEPTH)
   const onShutdown = (): void => {
     if (shown && shown.scene === scene) shown = null
   }

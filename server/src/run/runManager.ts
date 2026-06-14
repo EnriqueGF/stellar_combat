@@ -7,10 +7,15 @@ import {
   COST_REACTOR,
   COST_REPAIR_PER_POINT,
   COST_SYSTEM_BASE,
+  BOSS_ENCOUNTER,
+  COMBAT_ENCOUNTERS,
+  FIRST_ENCOUNTER,
   COST_SYSTEM_PER_LEVEL,
   CREW_CLASSES,
   CREW_NAMES,
+  CREW_RACE_IDS,
   CREW_SIZE,
+  crewHpMax,
   DRONE_IDS,
   ELITE_LOOT_MULT,
   GAME_EVENTS,
@@ -30,9 +35,11 @@ import {
   mulberry32,
   nextId,
   pickWeighted,
+  type CombatEncounterDef,
   type CrewClassId,
   type DefenseModuleId,
   type DroneId,
+  type EncounterChoiceDef,
   type GameEventDef,
   type NpcTemplate,
   type RunStatePublic,
@@ -45,16 +52,38 @@ import {
   type UpgradeItem,
   type WeaponId,
 } from '@stellar/shared'
-import type { CrewSetup, ShipSetup } from '../sim/api'
+import type { BattleMod, CrewSetup, ShipSetup } from '../sim/api'
 import { generateSector } from './sector'
 
 const SYSTEM_IDS: SystemId[] = ['weapons', 'shields', 'engines', 'oxygen', 'medbay', 'cockpit', 'drones']
 /** Last template index usable by regular/elite/ambush fights (the final one is the boss). */
 const MAX_NON_BOSS_TEMPLATE = NPC_TEMPLATES.length - 2
+/** Pre-combat bribe toll: flat base + per-column scaling. */
+const BRIBE_BASE = 12
+const BRIBE_PER_COLUMN = 6
 
 export type NodeEntry =
-  | { kind: 'battle'; template: NpcTemplate; elite: boolean; boss: boolean; firstBattle: boolean }
+  | {
+      kind: 'battle'
+      template: NpcTemplate
+      elite: boolean
+      boss: boolean
+      firstBattle: boolean
+      /** Enemy setup modifiers from a pre-combat encounter (sneak attack). */
+      mod?: BattleMod
+      /** Battle-log line emitted when the fight opens (encounter flavour). */
+      introLog?: string
+    }
   | { kind: 'screen' }
+  | { kind: 'invalid' }
+
+export type BattleEntry = Extract<NodeEntry, { kind: 'battle' }>
+
+/** Outcome of resolving an event/encounter choice. */
+export type EventResolution =
+  | { kind: 'ok' }
+  | { kind: 'dead' }
+  | { kind: 'battle'; entry: BattleEntry }
   | { kind: 'invalid' }
 
 export type BuyOutcome = { ok: true } | { ok: false; code: 'cannot_afford' | 'bad_intent'; msg: string }
@@ -67,6 +96,8 @@ export class RunManager {
 
   private currentNodeId: number
   private scrap = 0
+  /** Lifetime scrap gained this run (for the profile stat); spending never lowers it. */
+  private scrapGained = 0
   private hull: number
   private readonly hullMax: number
   private reactor: number
@@ -74,6 +105,8 @@ export class RunManager {
   private readonly shipClass: ShipClassId
   private readonly shipName: string
   private systems: Partial<Record<SystemId, number>>
+  /** Player's energy distribution, carried between battles (null = use the default). */
+  private power: Partial<Record<SystemId, number>> | null = null
   private weapons: WeaponId[]
   private drones: DroneId[]
   private readonly defenseModule: DefenseModuleId
@@ -82,7 +115,16 @@ export class RunManager {
   private shopOffers: ShopOffer[] | null = null
   private event: GameEventDef | null = null
   private eventResult: string | null = null
+  private eventDelta: { scrap: number; hull: number; ammo: number } | null = null
   private readonly usedEventIds = new Set<string>()
+  private readonly usedEncounterIds = new Set<string>()
+  /** Discovered nodes: visited + their neighbours (FTL-style fog of war). */
+  private readonly revealedNodeIds = new Set<number>()
+  /** Battle queued behind the current pre-combat encounter (null = none pending). */
+  private pendingBattle: BattleEntry | null = null
+  /** Resolved (affordable) encounter choices, parallel to the shown event choices. */
+  private combatChoices: EncounterChoiceDef[] | null = null
+  private combatBribeCost = 0
   private alive = true
   private victory = false
 
@@ -90,6 +132,10 @@ export class RunManager {
     this.rng = mulberry32(seed)
     this.sector = generateSector(this.rng)
     this.currentNodeId = this.sector.startNodeId
+    this.revealNode(this.currentNodeId)
+    // The sector boss is always visible at the end as the run's objective.
+    const boss = this.sector.nodes.find((n) => n.type === 'boss')
+    if (boss) this.revealedNodeIds.add(boss.id)
     this.shipClass = setup.shipClass
     this.shipName = setup.name
     this.hull = setup.hull
@@ -111,6 +157,11 @@ export class RunManager {
     return this.scrap
   }
 
+  /** Total scrap earned this run (gains only), for lifetime account stats. */
+  get scrapEarnedThisRun(): number {
+    return this.scrapGained
+  }
+
   get column(): number {
     return this.currentNode().col
   }
@@ -123,6 +174,12 @@ export class RunManager {
     return found
   }
 
+  /** Marks a node as discovered. Only nodes the player actually visits are revealed:
+   *  the next options stay unknown ("?") so each jump is a leap into the dark. */
+  private revealNode(nodeId: number): void {
+    this.revealedNodeIds.add(nodeId)
+  }
+
   /** Moves to a node reachable from the current one and reports what happens there. */
   enterNode(nodeId: number): NodeEntry {
     if (this.inBattle || !this.alive) return { kind: 'invalid' }
@@ -131,36 +188,49 @@ export class RunManager {
     if (!node) return { kind: 'invalid' }
 
     this.currentNodeId = nodeId
+    this.revealNode(nodeId)
     this.event = null
     this.eventResult = null
+    this.eventDelta = null
     this.shopOffers = null
+    this.pendingBattle = null
+    this.combatChoices = null
 
     switch (node.type) {
       case 'combat':
-        return {
-          kind: 'battle',
-          template: this.templateAt(clamp(node.col - 1, 0, MAX_NON_BOSS_TEMPLATE)),
-          elite: false,
-          boss: false,
-          firstBattle: node.col === 1,
-        }
+        return this.openCombat(
+          {
+            kind: 'battle',
+            template: this.templateAt(clamp(node.col - 1, 0, MAX_NON_BOSS_TEMPLATE)),
+            elite: false,
+            boss: false,
+            firstBattle: node.col === 1,
+          },
+          node.col,
+        )
       case 'elite':
         // Elite at column c uses the template of column c+1 (GAME_SPEC §4.1).
-        return {
-          kind: 'battle',
-          template: this.templateAt(clamp(node.col, 0, MAX_NON_BOSS_TEMPLATE)),
-          elite: true,
-          boss: false,
-          firstBattle: false,
-        }
+        return this.openCombat(
+          {
+            kind: 'battle',
+            template: this.templateAt(clamp(node.col, 0, MAX_NON_BOSS_TEMPLATE)),
+            elite: true,
+            boss: false,
+            firstBattle: false,
+          },
+          node.col,
+        )
       case 'boss':
-        return {
-          kind: 'battle',
-          template: this.templateAt(NPC_TEMPLATES.length - 1),
-          elite: false,
-          boss: true,
-          firstBattle: false,
-        }
+        return this.openCombat(
+          {
+            kind: 'battle',
+            template: this.templateAt(NPC_TEMPLATES.length - 1),
+            elite: false,
+            boss: true,
+            firstBattle: false,
+          },
+          node.col,
+        )
       case 'event':
         this.event = this.pickEvent()
         return { kind: 'screen' }
@@ -170,6 +240,40 @@ export class RunManager {
       case 'start':
         return { kind: 'invalid' }
     }
+  }
+
+  /**
+   * Wraps every fight in a pre-combat encounter (FTL-style): the player always
+   * reads a short narration that names who they have run into and that the enemy
+   * is hostile. The first fight and the boss are narrated single-choice intros;
+   * the rest offer ways to gain an edge or avoid the battle.
+   */
+  private openCombat(entry: BattleEntry, col: number): NodeEntry {
+    const encounter = entry.boss
+      ? BOSS_ENCOUNTER
+      : entry.firstBattle
+        ? FIRST_ENCOUNTER
+        : this.pickEncounter()
+    this.combatBribeCost = BRIBE_BASE + BRIBE_PER_COLUMN * col
+    // Only offer a toll if the player can actually pay it.
+    const choices = encounter.choices.filter(
+      (c) => c.action.kind !== 'bribe' || this.scrap >= this.combatBribeCost,
+    )
+    this.pendingBattle = entry
+    this.combatChoices = choices
+    this.event = {
+      id: encounter.id,
+      title: encounter.title,
+      text: encounter.text,
+      combat: true,
+      enemyName: entry.template.name,
+      enemyClass: SHIPS[entry.template.shipClass]?.name ?? entry.template.shipClass,
+      choices: choices.map((c) => ({
+        label: c.action.kind === 'bribe' ? `${c.label} (−${this.combatBribeCost} chatarra)` : c.label,
+        outcomes: [],
+      })),
+    }
+    return { kind: 'screen' }
   }
 
   /** NPC for a reconnect ambush: regular template of the current column. */
@@ -186,6 +290,7 @@ export class RunManager {
       hullMax: this.hullMax,
       reactor: this.reactor,
       systems: { ...this.systems },
+      power: this.power ? { ...this.power } : undefined,
       weapons: [...this.weapons],
       drones: [...this.drones],
       defenseModule: this.defenseModule,
@@ -198,10 +303,17 @@ export class RunManager {
    * Persists battle outcome. System damage is considered fully repaired between
    * nodes (crew would repair it anyway); hull and crew HP carry over as-is.
    */
-  absorbBattleState(hull: number, ammo: number, crew: CrewSetup[]): void {
+  absorbBattleState(
+    hull: number,
+    ammo: number,
+    crew: CrewSetup[],
+    power: Partial<Record<SystemId, number>>,
+  ): void {
     this.hull = clamp(hull, 1, this.hullMax)
     this.ammo = clamp(Math.floor(ammo), 0, MAX_AMMO)
     this.crew = crew.filter((c) => c.hp > 0).map((c) => ({ ...c }))
+    // Carry the player's energy distribution into the next battle.
+    this.power = { ...power }
   }
 
   /** Post-victory loot: scrap + 0-2 missiles + WEAPON_DROP_CHANCE of a loot weapon. */
@@ -209,6 +321,7 @@ export class RunManager {
     let scrap = SCRAP_BASE + Math.floor(this.rng() * (SCRAP_RANDOM + 1)) + SCRAP_PER_COLUMN * this.column
     if (elite) scrap = Math.round(scrap * ELITE_LOOT_MULT)
     this.scrap += scrap
+    this.scrapGained += scrap
     this.ammo = clamp(this.ammo + Math.floor(this.rng() * 3), 0, MAX_AMMO)
     if (this.rng() < WEAPON_DROP_CHANCE) this.lootWeapon = this.randomWeapon()
   }
@@ -221,16 +334,21 @@ export class RunManager {
     this.victory = true
   }
 
-  /** Resolves an event choice with pickWeighted. 'dead' = the whole crew is gone. */
-  resolveEventChoice(choiceIdx: number): 'ok' | 'dead' | 'invalid' {
-    if (this.inBattle || !this.alive || !this.event) return 'invalid'
+  /** Resolves an event/encounter choice. A combat encounter may start a battle. */
+  resolveEventChoice(choiceIdx: number): EventResolution {
+    if (this.inBattle || !this.alive) return { kind: 'invalid' }
+    if (this.combatChoices && this.pendingBattle) return this.resolveEncounterChoice(choiceIdx)
+    if (!this.event) return { kind: 'invalid' }
     const choice = this.event.choices[choiceIdx]
-    if (!choice) return 'invalid'
+    if (!choice) return { kind: 'invalid' }
     const outcome = choice.outcomes[pickWeighted(choice.outcomes.map((o) => o.weight), this.rng())]
-    if (!outcome) return 'invalid'
+    if (!outcome) return { kind: 'invalid' }
 
     let text = outcome.text
-    if (outcome.scrap) this.scrap = Math.max(0, this.scrap + outcome.scrap)
+    if (outcome.scrap) {
+      this.scrap = Math.max(0, this.scrap + outcome.scrap)
+      if (outcome.scrap > 0) this.scrapGained += outcome.scrap
+    }
     // Event hull damage can cripple but never destroy the ship (clamped to 1).
     if (outcome.hull) this.hull = clamp(this.hull + outcome.hull, 1, this.hullMax)
     if (outcome.ammo) this.ammo = clamp(this.ammo + outcome.ammo, 0, MAX_AMMO)
@@ -252,11 +370,85 @@ export class RunManager {
       }
     }
     this.eventResult = text
+    this.eventDelta = {
+      scrap: outcome.scrap ?? 0,
+      hull: outcome.hull ?? 0,
+      ammo: outcome.ammo ?? 0,
+    }
     if (this.crew.length === 0) {
       this.alive = false
-      return 'dead'
+      return { kind: 'dead' }
     }
-    return 'ok'
+    return { kind: 'ok' }
+  }
+
+  /** Pre-combat encounter choice: fight (perhaps with an edge) or avoid the battle. */
+  private resolveEncounterChoice(choiceIdx: number): EventResolution {
+    const choices = this.combatChoices
+    const entry = this.pendingBattle
+    if (!choices || !entry) return { kind: 'invalid' }
+    const choice = choices[choiceIdx]
+    if (!choice) return { kind: 'invalid' }
+
+    const startBattle = (mod?: BattleMod, introLog?: string): EventResolution => {
+      this.pendingBattle = null
+      this.combatChoices = null
+      this.event = null
+      this.eventResult = null
+      this.eventDelta = null
+      return { kind: 'battle', entry: { ...entry, mod, introLog } }
+    }
+    // Avoiding keeps `this.event` so the result view still shows the encounter title.
+    const avoid = (
+      text: string,
+      delta?: { scrap: number; hull: number; ammo: number },
+    ): EventResolution => {
+      this.pendingBattle = null
+      this.combatChoices = null
+      this.eventResult = text
+      this.eventDelta = delta ?? null
+      return { kind: 'ok' }
+    }
+
+    const action = choice.action
+    switch (action.kind) {
+      case 'fight':
+        return startBattle()
+      case 'sneak': {
+        const ok = pickWeighted([action.successWeight, action.failWeight], this.rng()) === 0
+        return ok
+          ? startBattle({ enemyHullMult: 0.7, enemyStartFire: true }, choice.successLog)
+          : startBattle(undefined, choice.failLog)
+      }
+      case 'evade': {
+        const ok = pickWeighted([action.successWeight, action.failWeight], this.rng()) === 0
+        return ok
+          ? avoid(choice.avoidText ?? 'Logras eludir el combate sin disparar un solo tiro.')
+          : startBattle(undefined, choice.failLog)
+      }
+      case 'bribe': {
+        const paid = Math.min(this.scrap, this.combatBribeCost)
+        this.scrap = Math.max(0, this.scrap - this.combatBribeCost)
+        return avoid(choice.avoidText ?? 'Pagas el peaje y te dejan seguir tu camino.', {
+          scrap: -paid,
+          hull: 0,
+          ammo: 0,
+        })
+      }
+    }
+  }
+
+  /** Random combat encounter not seen recently (the pool resets when exhausted). */
+  private pickEncounter(): CombatEncounterDef {
+    let pool = COMBAT_ENCOUNTERS.filter((e) => !this.usedEncounterIds.has(e.id))
+    if (pool.length === 0) {
+      this.usedEncounterIds.clear()
+      pool = [...COMBAT_ENCOUNTERS]
+    }
+    const e = pool[Math.floor(this.rng() * pool.length)] ?? COMBAT_ENCOUNTERS[0]
+    if (!e) throw new Error('combat encounter table is empty')
+    this.usedEncounterIds.add(e.id)
+    return e
   }
 
   buy(item: UpgradeItem): BuyOutcome {
@@ -313,14 +505,18 @@ export class RunManager {
     if (this.inBattle) return
     this.event = null
     this.eventResult = null
+    this.eventDelta = null
     this.shopOffers = null
     this.lootWeapon = null
+    this.pendingBattle = null
+    this.combatChoices = null
   }
 
   publicState(): RunStatePublic {
     return {
       sector: this.sector,
       currentNodeId: this.currentNodeId,
+      revealedNodeIds: [...this.revealedNodeIds],
       column: this.column,
       scrap: this.scrap,
       hull: this.hull,
@@ -338,6 +534,7 @@ export class RunManager {
       shopOffers: this.shopOffers ? this.shopOffers.map((o) => ({ ...o })) : null,
       event: this.event,
       eventResult: this.eventResult,
+      eventDelta: this.eventDelta ? { ...this.eventDelta } : null,
       alive: this.alive,
       victory: this.victory,
     }
@@ -474,8 +671,9 @@ export class RunManager {
     const used = new Set(this.crew.map((c) => c.name))
     const free = CREW_NAMES.filter((n) => !used.has(n))
     const name = free[Math.floor(this.rng() * free.length)] ?? `Recluta ${this.crew.length + 1}`
-    const hp = CREW_CLASSES[cls].hpMax[0]
-    return { id: nextId('crew'), name, cls, level: 1, xp: 0, hp, hpMax: hp }
+    const race = CREW_RACE_IDS[Math.floor(this.rng() * CREW_RACE_IDS.length)] ?? 'human'
+    const hp = crewHpMax(cls, race, 1)
+    return { id: nextId('crew'), name, cls, race, level: 1, xp: 0, hp, hpMax: hp }
   }
 }
 

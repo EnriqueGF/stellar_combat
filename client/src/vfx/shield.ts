@@ -84,7 +84,11 @@ export class ShieldBubble implements IShieldBubble {
         const ey = y / (radiusY - hexR * 0.5)
         if (ex * ex + ey * ey > 1) continue
         const rNorm = Math.sqrt((x / radiusX) ** 2 + (y / radiusY) ** 2)
-        const baseAlpha = 0.2 + 0.5 * rNorm * rNorm
+        // Keep the centre of the bubble clear so the ship inside stays readable
+        // (FTL look): the hex field only fills a band near the rim, fading in from
+        // ~62% of the radius outward instead of tinting the whole interior.
+        if (rNorm < 0.62) continue
+        const baseAlpha = 0.04 + 0.28 * ((rNorm - 0.62) / 0.38)
         const img = scene.add
           .image(x, y, HEX_KEY)
           .setScale(this.hexScale)
@@ -127,15 +131,17 @@ export class ShieldBubble implements IShieldBubble {
     const strength = max > 0 ? n / max : 0
     this.scene.tweens.killTweensOf(this)
 
+    // Flash on ANY real layer drop (e.g. 3->2 as well as the final 1->0), never on
+    // the initial state (prev === -1) nor on a gain. prev > n implies prev >= 0.
+    if (prev > n) this.collapseFlash()
+
     if (n <= 0) {
-      // Collapse flash only on a real drop (not on initial state).
-      if (prev > 0) this.collapseFlash()
       this.scene.tweens.add({ targets: this, layerAlpha: 0, duration: 160 })
       return
     }
 
     this.redrawRim(strength)
-    const target = 0.35 + 0.65 * strength
+    const target = 0.3 + 0.45 * strength
     if (prev <= 0) {
       this.scene.tweens.add({ targets: this, layerAlpha: target, duration: 200 })
     } else {
@@ -204,31 +210,58 @@ export class ShieldBubble implements IShieldBubble {
 
   private redrawRim(strength: number): void {
     this.rim.clear()
-    this.rim.fillStyle(COLORS.shield, 0.04 + 0.05 * strength)
+    // Only a whisper of interior fill — the bubble reads as a rim ring, not a
+    // tinted disc, so the ship and its rooms stay visible behind active shields.
+    this.rim.fillStyle(COLORS.shield, 0.012 + 0.02 * strength)
     this.rim.fillEllipse(0, 0, this.rx * 2, this.ry * 2)
-    this.rim.lineStyle(5 + 3 * strength, COLORS.shield, 0.16 + 0.2 * strength)
+    this.rim.lineStyle(5 + 3 * strength, COLORS.shield, 0.14 + 0.18 * strength)
     this.rim.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
-    this.rim.lineStyle(1.5 + 2 * strength, COLORS.shield, 0.55)
+    this.rim.lineStyle(1.5 + 2 * strength, COLORS.shield, 0.6)
     this.rim.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
   }
 
   private collapseFlash(): void {
-    const g = this.scene.add.graphics({ x: this.container.x, y: this.container.y })
-    g.lineStyle(4, 0xffffff, 0.9)
-    g.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
-    g.lineStyle(8, COLORS.shield, 0.4)
-    g.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
-    this.temp.add(g)
+    // Losing a shield layer must be impossible to miss: a bright filled disc
+    // "pops" across the whole bubble for a frame, while a thick rim ring expands
+    // outward and fades. (Previously just a thin expanding outline — too subtle.)
+    const fill = this.scene.add.graphics({ x: this.container.x, y: this.container.y })
+    fill.fillStyle(COLORS.shield, 0.32)
+    fill.fillEllipse(0, 0, this.rx * 2, this.ry * 2)
+    fill.lineStyle(3, 0xffffff, 0.85)
+    fill.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
+    fill.setBlendMode(Phaser.BlendModes.ADD)
+    this.temp.add(fill)
     this.scene.tweens.add({
-      targets: g,
-      scaleX: 1.18,
-      scaleY: 1.18,
+      targets: fill,
+      scaleX: 1.06,
+      scaleY: 1.06,
       alpha: 0,
-      duration: 260,
+      duration: 220,
       ease: 'Quad.easeOut',
       onComplete: () => {
-        this.temp.delete(g)
-        g.destroy()
+        this.temp.delete(fill)
+        fill.destroy()
+      },
+    })
+
+    // Shockwave ring expanding well past the rim so the drop reads even at a glance.
+    const ring = this.scene.add.graphics({ x: this.container.x, y: this.container.y })
+    ring.lineStyle(5, 0xffffff, 0.95)
+    ring.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
+    ring.lineStyle(10, COLORS.shield, 0.45)
+    ring.strokeEllipse(0, 0, this.rx * 2, this.ry * 2)
+    ring.setBlendMode(Phaser.BlendModes.ADD)
+    this.temp.add(ring)
+    this.scene.tweens.add({
+      targets: ring,
+      scaleX: 1.38,
+      scaleY: 1.38,
+      alpha: 0,
+      duration: 320,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.temp.delete(ring)
+        ring.destroy()
       },
     })
   }

@@ -1,0 +1,60 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Módulos de defensa" current="modulos/" lede="Cada nave equipa exactamente un módulo de defensa. No cuesta puntos: es una decisión de estilo, con su contrapartida.">
+  <p>
+    El módulo de defensa es una elección del loadout (uno por nave) que ajusta cómo encajas el daño.
+    Salvo el estándar, todos dan una ventaja a cambio de un pequeño coste. Piensa en él como el «carácter
+    defensivo» de tu nave.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Módulo</th><th>Ventaja</th><th>Contrapartida</th></tr></thead>
+      <tbody>
+        <tr><td>Escudos Estándar</td><td>—  (referencia neutra)</td><td>Ninguna</td></tr>
+        <tr><td>Armadura Reactiva</td><td>−25% de daño al casco</td><td>−5% de evasión</td></tr>
+        <tr><td>Campo de Dispersión</td><td>+10% de evasión</td><td>escudos regeneran un 50% más lento</td></tr>
+        <tr><td>Defensa Puntual</td><td>70% de derribar misiles/bombas entrantes</td><td>solo misiles; escudos regeneran un 25% más lento</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card accent-top">
+      <h3>Escudos Estándar</h3>
+      <p class="sub">Configuración de fábrica.</p>
+      <p class="desc">Sin bonus ni penalización. La opción segura si no quieres comprometerte: toda tu
+        defensa viene de los <a href={`${base}sistemas/`}>escudos</a> y la evasión normales.</p>
+    </div>
+    <div class="card accent-top">
+      <h3>Armadura Reactiva</h3>
+      <p class="sub">Placas que detonan al impacto.</p>
+      <p class="desc"><strong>−25% de daño al casco</strong> a cambio de <strong>−5% de evasión</strong>.
+        Brilla en naves lentas y aguantadoras (como el <a href={`${base}naves/`}>Bastión</a>) que prefieren
+        encajar antes que esquivar.</p>
+    </div>
+    <div class="card accent-top">
+      <h3>Campo de Dispersión</h3>
+      <p class="sub">Distorsiona los sensores enemigos.</p>
+      <p class="desc"><strong>+10% de evasión</strong> (hacia el tope del 45%) pero los
+        <strong>escudos regeneran un 50% más lento</strong>. Ideal para naves ágiles con buenos motores y
+        piloto, que prefieren no recibir el golpe a pararlo.</p>
+    </div>
+    <div class="card accent-top">
+      <h3>Defensa Puntual</h3>
+      <p class="sub">Torretas automáticas antimisiles.</p>
+      <p class="desc"><strong>70% de derribar</strong> cada misil o bomba que te disparen, a costa de que
+        los escudos <strong>regeneren un 25% más lento</strong>. Tu mejor respuesta a un rival cargado de
+        <a href={`${base}armas/`} class="c-explosive">explosivos</a> que perforan escudos.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="ctitle">¿Cuál elijo?</span>
+    <p>Contra mucha <span class="c-explosive">munición</span> → Defensa Puntual. Si esquivas mucho y
+      quieres esquivar más → Campo de Dispersión. Si vas a tanquear de frente → Armadura Reactiva. Si
+      dudas → Estándar y a centrarte en sistemas y armas.</p>
+  </div>
+</Layout>

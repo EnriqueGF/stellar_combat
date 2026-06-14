@@ -18,7 +18,7 @@ import {
 } from '@stellar/shared'
 import type { IAudioEngine } from '../contracts'
 import type { TypedSocket } from '../contracts'
-import { COLORS, COLORS_CSS, HUD, catColor } from '../theme'
+import { COLORS, COLORS_CSS, GAME_HEIGHT, GAME_WIDTH, HUD, catColor } from '../theme'
 import {
   CATEGORY_NAMES,
   CATEGORY_TRIANGLE_TEXT,
@@ -43,18 +43,19 @@ import { ProgressBar, Tooltip, type IProgressBar } from './uiKit'
 const BAR_Y = HUD.bottomBar.y
 const DEPTH = 14
 
-const REACTOR_X = 10
-const SYS_X = 84
-const SYS_COL_W = 40
-const WEAP_X = 372
-const SLOT_W = 105
-const SLOT_INNER_W = 99
-const AMMO_X = 800
-const DRONE_X = 862
-const DRONE_STEP = 58
-const HELP_X = 1062
-const JUMP_X = 1160
-const JUMP_W = 112
+// Compact FTL-style layout: systems and weapons take less room, packed to the left.
+const REACTOR_X = 8
+const SYS_X = 74
+const SYS_COL_W = 33
+const WEAP_X = 312
+const SLOT_W = 90
+const SLOT_INNER_W = 84
+const SLOT_H = 92
+const DRONE_X = 686
+const DRONE_STEP = 52
+const HELP_X = 852
+const JUMP_X = 930
+const JUMP_W = 130
 
 export interface HudCallbacks {
   onSelectWeapon(slot: number): void
@@ -78,6 +79,10 @@ interface SlotWidget {
   targetCharge: number
   ready: boolean
   lastKey: string
+  /** Last drawn radial state (charge bucket + powered) so it refreshes on any
+   *  visual change, not only when displayCharge is animating (e.g. powering a
+   *  weapon while paused freezes the charge but must still redraw). */
+  lastRadialKey: string
 }
 
 interface DroneWidget {
@@ -99,8 +104,6 @@ export class BottomHud {
   private readonly systemsGfx: Phaser.GameObjects.Graphics
   private readonly slots: SlotWidget[] = []
   private readonly droneWidgets: DroneWidget[] = []
-  private readonly ammoGfx: Phaser.GameObjects.Graphics
-  private readonly ammoText: Phaser.GameObjects.Text
   private readonly jumpGfx: Phaser.GameObjects.Graphics
   private readonly jumpTitle: Phaser.GameObjects.Text
   private readonly jumpReason: Phaser.GameObjects.Text
@@ -110,7 +113,6 @@ export class BottomHud {
   private reactorKey = ''
   private systemsKey = ''
   private jumpKey = ''
-  private ammoKey = -1
   private installedSystems: SystemId[] = []
 
   constructor(
@@ -125,15 +127,15 @@ export class BottomHud {
     this.cb = cb
     this.state = initial
 
-    // --- static background ---
+    // No bottom bar / dividers: the controls float "al aire" over the backdrop
+    // (FTL-style, less overwhelming). A soft bottom-up gradient — no hard edge —
+    // just lifts them off busy planets without boxing them in.
     const bg = scene.add.graphics().setDepth(DEPTH - 1)
-    bg.fillStyle(COLORS.panel, 0.94)
-    bg.fillRect(0, BAR_Y, 1280, HUD.bottomBar.h)
-    bg.lineStyle(2, COLORS.panelBorder, 0.55)
-    bg.lineBetween(0, BAR_Y, 1280, BAR_Y)
-    bg.lineStyle(1, 0x35506e, 0.8)
-    for (const x of [80, 368, 794, 856, 1042, 1152]) {
-      bg.lineBetween(x, BAR_Y + 10, x, BAR_Y + HUD.bottomBar.h - 10)
+    const bands = 18
+    const span = GAME_HEIGHT - BAR_Y
+    for (let i = 0; i < bands; i++) {
+      bg.fillStyle(COLORS.spaceDeep, 0.5 * (i / (bands - 1)))
+      bg.fillRect(0, BAR_Y + (i * span) / bands, GAME_WIDTH, Math.ceil(span / bands) + 1)
     }
     this.disposables.push(bg)
 
@@ -184,21 +186,7 @@ export class BottomHud {
     // --- weapon slots ---
     initial.weapons.forEach((w, i) => this.createSlot(w, i))
 
-    // --- ammo counter ---
-    this.ammoGfx = scene.add.graphics().setDepth(DEPTH)
-    this.disposables.push(this.ammoGfx)
-    this.ammoText = makeText(scene, AMMO_X + 30, BAR_Y + 46, '0', 20).setDepth(DEPTH)
-    this.disposables.push(this.ammoText)
-    const ammoLabel = makeText(scene, AMMO_X + 28, BAR_Y + 96, 'MISILES', 8, COLORS_CSS.textDim)
-      .setOrigin(0.5, 0)
-      .setDepth(DEPTH)
-    this.disposables.push(ammoLabel)
-    const ammoZone = scene.add.zone(AMMO_X + 28, BAR_Y + 67, 56, 125).setInteractive().setDepth(DEPTH)
-    Tooltip.attach(ammoZone, () => {
-      const s = this.state
-      return `Misiles: ${s.ammo}/${s.ammoMax} (munición global).\nLas armas explosivas consumen 1 por andanada.`
-    })
-    this.disposables.push(ammoZone)
+    // (Missile count now lives in the top-left vital-stats panel; see Readouts.)
 
     // --- drones ---
     for (let i = 0; i < 3; i++) {
@@ -230,38 +218,20 @@ export class BottomHud {
       this.disposables.push(gfx, zone)
     }
 
-    // --- help corner ---
-    const helpGfx = scene.add.graphics().setDepth(DEPTH)
-    helpGfx.lineStyle(1.5, COLORS.panelBorder, 0.9)
-    helpGfx.strokeCircle(HELP_X + 35, BAR_Y + 42, 13)
-    this.disposables.push(helpGfx)
-    const helpText = makeText(scene, HELP_X + 35, BAR_Y + 42, '?', 15, COLORS_CSS.panelBorder)
-      .setOrigin(0.5)
-      .setDepth(DEPTH)
-    this.disposables.push(helpText)
-    const helpLabel = makeText(scene, HELP_X + 35, BAR_Y + 64, 'AYUDA', 8, COLORS_CSS.textDim)
-      .setOrigin(0.5, 0)
-      .setDepth(DEPTH)
-    this.disposables.push(helpLabel)
+    // --- SPACE→pause hint (the "?" AYUDA affordance was removed) ---
+    // Centred in the freed column between the drones and the jump button.
     const hint = makeText(
       scene,
       HELP_X + 35,
-      BAR_Y + 92,
+      BAR_Y + 60,
       'ESPACIO\npausa',
-      8,
+      9,
       COLORS_CSS.textDim,
       { align: 'center' },
     )
-      .setOrigin(0.5, 0)
+      .setOrigin(0.5)
       .setDepth(DEPTH)
     this.disposables.push(hint)
-    const helpZone = scene.add.zone(HELP_X + 35, BAR_Y + 60, 60, 110).setInteractive().setDepth(DEPTH)
-    Tooltip.attach(
-      helpZone,
-      () =>
-        'Atajos de teclado:\n1-4: seleccionar arma (apuntar)\nClick derecho: cancelar selección\nA: autodisparo del arma seleccionada\nESPACIO: pausa táctica\nJ: cargar el salto (huir)\nESC: menú (opciones · abandonar)',
-    )
-    this.disposables.push(helpZone)
 
     // --- jump ---
     this.jumpGfx = scene.add.graphics().setDepth(DEPTH)
@@ -307,18 +277,18 @@ export class BottomHud {
 
     const base = scene.add.graphics().setDepth(DEPTH)
     base.fillStyle(0x0c1320, 0.95)
-    base.fillRoundedRect(x, y, SLOT_INNER_W, 123, 6)
+    base.fillRoundedRect(x, y, SLOT_INNER_W, SLOT_H, 6)
     base.lineStyle(1, 0x35506e, 1)
-    base.strokeRoundedRect(x, y, SLOT_INNER_W, 123, 6)
-    drawCategoryIcon(base, def.category, x + 14, y + 40, 13, color)
-    drawTriangleBadge(base, x + 30, y + 40, 10, color)
+    base.strokeRoundedRect(x, y, SLOT_INNER_W, SLOT_H, 6)
+    drawCategoryIcon(base, def.category, x + 14, y + 30, 13, color)
+    drawTriangleBadge(base, x + 30, y + 30, 10, color)
     this.disposables.push(base)
 
     const num = makeText(scene, x + 6, y + 2, `${i + 1}`, 18, COLORS_CSS.textDim, {
       fontStyle: 'bold',
     }).setDepth(DEPTH)
     this.disposables.push(num)
-    const name = makeText(scene, x + 6, y + 56, WEAPON_SHORT[w.weaponId], 10, COLORS_CSS.text, {
+    const name = makeText(scene, x + 6, y + 46, WEAPON_SHORT[w.weaponId], 10, COLORS_CSS.text, {
       wordWrap: { width: SLOT_INNER_W - 12 },
     }).setDepth(DEPTH)
     this.disposables.push(name)
@@ -326,14 +296,14 @@ export class BottomHud {
     const radialGfx = scene.add.graphics().setDepth(DEPTH + 1)
     const borderGfx = scene.add.graphics().setDepth(DEPTH + 1)
     borderGfx.lineStyle(2, COLORS.ok, 1)
-    borderGfx.strokeRoundedRect(x, y, SLOT_INNER_W, 123, 6)
+    borderGfx.strokeRoundedRect(x, y, SLOT_INNER_W, SLOT_H, 6)
     borderGfx.setVisible(false)
     const selGfx = scene.add.graphics().setDepth(DEPTH + 2)
     selGfx.lineStyle(2, color, 1)
-    selGfx.strokeRoundedRect(x - 1, y - 1, SLOT_INNER_W + 2, 125, 6)
+    selGfx.strokeRoundedRect(x - 1, y - 1, SLOT_INNER_W + 2, SLOT_H + 2, 6)
     selGfx.setVisible(false)
     const statusGfx = scene.add.graphics().setDepth(DEPTH + 1)
-    const statusText = makeText(scene, x + SLOT_INNER_W / 2 + 8, y + 104, '', 8, COLORS_CSS.warn)
+    const statusText = makeText(scene, x + SLOT_INNER_W / 2 + 8, y + 78, '', 8, COLORS_CSS.warn)
       .setOrigin(0.5)
       .setDepth(DEPTH + 1)
     this.disposables.push(radialGfx, borderGfx, selGfx, statusGfx, statusText)
@@ -351,7 +321,7 @@ export class BottomHud {
     this.disposables.push(autoBadge)
 
     const zone = scene.add
-      .zone(x + SLOT_INNER_W / 2, y + 61, SLOT_INNER_W, 123)
+      .zone(x + SLOT_INNER_W / 2, y + SLOT_H / 2, SLOT_INNER_W, SLOT_H)
       .setInteractive()
       .setDepth(DEPTH)
     zone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -376,6 +346,7 @@ export class BottomHud {
       targetCharge: w.charge,
       ready: false,
       lastKey: '',
+      lastRadialKey: '',
     }
     this.slots.push(slot)
     this.redrawRadial(slot, w)
@@ -476,13 +447,6 @@ export class BottomHud {
 
     state.weapons.forEach((w, i) => this.applySlot(w, i))
 
-    if (state.ammo !== this.ammoKey) {
-      this.ammoKey = state.ammo
-      this.ammoText.setText(`${state.ammo}`)
-      this.ammoText.setColor(state.ammo <= 3 ? COLORS_CSS.warn : COLORS_CSS.text)
-      this.ammoGfx.clear()
-      drawMissileIcon(this.ammoGfx, AMMO_X + 16, BAR_Y + 58, 20, state.ammo <= 3 ? COLORS.warn : COLORS.text, state.ammo === 0)
-    }
     if (
       !this.ammoNotified &&
       state.ammo === 0 &&
@@ -496,7 +460,7 @@ export class BottomHud {
     for (let i = state.drones.length; i < 3; i++) this.applyDrone(undefined, i)
 
     const j = state.jump
-    const jKey = `${j.charging ? 1 : 0}|${j.blocked ?? ''}|${Math.round(j.progress * 100)}`
+    const jKey = `${j.ready ? 1 : 0}|${j.blocked ?? ''}|${Math.round(j.progress * 100)}`
     if (jKey !== this.jumpKey) {
       this.jumpKey = jKey
       this.redrawJump()
@@ -572,10 +536,10 @@ export class BottomHud {
 
     slot.statusGfx.clear()
     if (!w.powered) {
-      drawPlugCrossed(slot.statusGfx, slot.x + 14, slot.y + 104, 12, COLORS.textDim)
+      drawPlugCrossed(slot.statusGfx, slot.x + 14, slot.y + 78, 12, COLORS.textDim)
       slot.statusText.setText('SIN ENERGÍA')
     } else if (noAmmo) {
-      drawMissileIcon(slot.statusGfx, slot.x + 14, slot.y + 104, 12, COLORS.warn, true)
+      drawMissileIcon(slot.statusGfx, slot.x + 14, slot.y + 78, 12, COLORS.warn, true)
       slot.statusText.setText('SIN MUNICIÓN')
     } else if (ready) {
       slot.statusText.setText('LISTA')
@@ -591,9 +555,9 @@ export class BottomHud {
 
   private redrawRadial(slot: SlotWidget, w: { powered: boolean }): void {
     const g = slot.radialGfx
-    const cx = slot.x + SLOT_INNER_W - 26
-    const cy = slot.y + 36
-    const r = 16
+    const cx = slot.x + SLOT_INNER_W - 24
+    const cy = slot.y + 30
+    const r = 15
     const def = WEAPONS[slot.weaponId]
     const color = catColor(def.category)
     g.clear()
@@ -684,36 +648,37 @@ export class BottomHud {
     const j = this.state.jump
     const g = this.jumpGfx
     g.clear()
-    const ready = j.progress >= 1
-    const border = ready ? COLORS.ok : j.charging ? COLORS.panelBorder : j.blocked !== null ? COLORS.warn : 0x35506e
+    const border = j.ready
+      ? j.blocked === 'no_crew'
+        ? COLORS.warn
+        : COLORS.ok
+      : j.blocked === 'no_engine_power'
+        ? COLORS.warn
+        : COLORS.panelBorder
     g.fillStyle(0x0c1320, 0.95)
     g.fillRoundedRect(JUMP_X, BAR_Y + 8, JUMP_W, 118, 6)
     g.lineStyle(2, border, 1)
     g.strokeRoundedRect(JUMP_X, BAR_Y + 8, JUMP_W, 118, 6)
 
-    if (ready) {
+    if (j.ready && j.blocked === 'no_crew') {
+      this.jumpTitle.setText('SALTO LISTO')
+      this.jumpTitle.setColor(COLORS_CSS.warn)
+      this.jumpReason.setText('Tripula los motores para saltar')
+      this.jumpReason.setColor(COLORS_CSS.warn)
+    } else if (j.ready) {
       this.jumpTitle.setText('¡SALTO LISTO!')
       this.jumpTitle.setColor(COLORS_CSS.ok)
-      this.jumpReason.setText('')
-    } else if (j.charging) {
-      this.jumpTitle.setText('CARGANDO SALTO')
-      this.jumpTitle.setColor(COLORS_CSS.text)
-      this.jumpReason.setText(`${Math.round(j.progress * 100)}% · click para cancelar`)
+      this.jumpReason.setText('[J] Huir del combate')
       this.jumpReason.setColor(COLORS_CSS.textDim)
-    } else if (j.blocked === 'no_pilot') {
-      this.jumpTitle.setText('SALTO')
-      this.jumpTitle.setColor(COLORS_CSS.textDim)
-      this.jumpReason.setText('Cabina sin piloto')
-      this.jumpReason.setColor(COLORS_CSS.warn)
     } else if (j.blocked === 'no_engine_power') {
       this.jumpTitle.setText('SALTO')
       this.jumpTitle.setColor(COLORS_CSS.textDim)
       this.jumpReason.setText('Motores sin energía')
       this.jumpReason.setColor(COLORS_CSS.warn)
     } else {
-      this.jumpTitle.setText('CARGAR SALTO')
+      this.jumpTitle.setText('CARGANDO SALTO')
       this.jumpTitle.setColor(COLORS_CSS.text)
-      this.jumpReason.setText('[J] Huir del combate')
+      this.jumpReason.setText(`${Math.round(j.progress * 100)}%`)
       this.jumpReason.setColor(COLORS_CSS.textDim)
     }
     this.jumpBar.setValue(clamp(j.progress, 0, 1))
@@ -728,24 +693,19 @@ export class BottomHud {
     this.state.weapons.forEach((w, i) => {
       const slot = this.slots[i]
       if (slot === undefined) return
-      const prev = slot.displayCharge
       slot.displayCharge += (slot.targetCharge - slot.displayCharge) * k
       if (Math.abs(slot.targetCharge - slot.displayCharge) < 0.004) {
         slot.displayCharge = slot.targetCharge
       }
-      if (Math.abs(prev - slot.displayCharge) > 0.004 || slot.lastKey === '') {
+      // Redraw on any visual change — charge OR powered state — so a weapon
+      // powered/charged during a tactical pause still shows its fill immediately.
+      const radialKey = `${Math.round(clamp(slot.displayCharge, 0, 1) * 100)}|${w.powered ? 1 : 0}`
+      if (radialKey !== slot.lastRadialKey) {
+        slot.lastRadialKey = radialKey
         this.redrawRadial(slot, w)
       }
       if (slot.ready) slot.borderGfx.setAlpha(0.55 + 0.45 * Math.sin(time / 170))
     })
-    if (this.ammoKey <= 3 && this.ammoKey >= 0) {
-      const blink = this.ammoKey === 0 || Math.sin(time / 200) > -0.4
-      this.ammoText.setAlpha(blink ? 1 : 0.35)
-      this.ammoGfx.setAlpha(blink ? 1 : 0.35)
-    } else {
-      this.ammoText.setAlpha(1)
-      this.ammoGfx.setAlpha(1)
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -765,7 +725,7 @@ export class BottomHud {
   }
 
   slotRect(i: number): Rect {
-    return { x: WEAP_X + i * SLOT_W + 3, y: BAR_Y + 6, w: SLOT_INNER_W, h: 123 }
+    return { x: WEAP_X + i * SLOT_W + 3, y: BAR_Y + 6, w: SLOT_INNER_W, h: SLOT_H }
   }
 
   slotCount(): number {

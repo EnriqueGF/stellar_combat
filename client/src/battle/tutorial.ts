@@ -93,9 +93,9 @@ export class TutorialController {
       {
         title: 'TRIPULACIÓN',
         text:
-          'Haz click en un retrato para seleccionar a un tripulante y luego en una sala de tu ' +
-          'nave para enviarlo. Reparan, apagan fuegos y sellan brechas solos; el ingeniero ' +
-          'repara más rápido. Click derecho deselecciona.',
+          'Selecciona tripulantes con clic izquierdo (en un retrato o en su ficha; arrastra ' +
+          'sobre la nave para elegir a varios) y dales orden de moverse con CLIC DERECHO en una ' +
+          'sala. Reparan, apagan fuegos y sellan brechas solos; el ingeniero repara más rápido.',
         rect: () => targets.portraits(),
       },
       {
@@ -154,7 +154,7 @@ export class TutorialController {
       scene,
       GAME_WIDTH / 2,
       345,
-      'Huir pierde el botín del nodo. ¿Cargar salto?',
+      'Huir pierde el botín del nodo. ¿Saltar ahora?',
       13,
       COLORS_CSS.text,
       { align: 'center', wordWrap: { width: 420 } },
@@ -169,7 +169,7 @@ export class TutorialController {
       scene,
       GAME_WIDTH / 2 - 90,
       398,
-      'Cargar salto',
+      'Saltar y huir',
       () => {
         closeModal()
         onConfirm()

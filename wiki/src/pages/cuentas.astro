@@ -1,0 +1,75 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Cuentas y extras" current="cuentas/" lede="Perfiles persistentes, la pantalla de resultado, las opciones de accesibilidad y la magia procedural que hace que cada partida se vea y suene distinta.">
+  <h2>Cuentas y perfil</h2>
+  <p>
+    Puedes jugar como <strong>invitado</strong> sin registrarte. Si quieres guardar tu progreso estadístico,
+    desde el botón de la esquina del menú puedes <strong>registrarte o iniciar sesión</strong> y tener un
+    perfil persistente con tus <strong>expediciones, combates, duelos y chatarra</strong> acumulada.
+  </p>
+  <ul>
+    <li>Las cuentas se guardan <strong>en el servidor</strong>, con las contraseñas cifradas (scrypt).</li>
+    <li>No hace falta ninguna base de datos externa: el servidor se basta solo.</li>
+    <li>El panel de cuenta es HTML normal sobre el lienzo del juego, así que se ve bien en cualquier pantalla.</li>
+  </ul>
+
+  <h2>La pantalla de resultado</h2>
+  <Figure src="screenshots/result.png" alt="Pantalla de resultado tras un combate" caption="Resultado de un combate: victoria o derrota, con tus estadísticas y los botones para continuar." />
+  <p>Al terminar un combate ves quién ganó y un resumen de la batalla:</p>
+  <ul>
+    <li><strong>Daño infligido y recibido.</strong></li>
+    <li><strong>Precisión</strong> (disparos acertados sobre disparos hechos).</li>
+    <li><strong>Sistemas destruidos</strong> y <strong>tripulación perdida</strong>.</li>
+    <li><strong>Chatarra</strong> obtenida y duración del combate.</li>
+  </ul>
+  <p>Los botones cambian según el contexto: continuar la expedición, volver al menú, etc.</p>
+
+  <h2>Opciones y accesibilidad</h2>
+  <p>Desde <strong>OPCIONES</strong> (en el menú o en pausa) ajustas:</p>
+  <ul>
+    <li><strong>Volúmenes</strong> independientes: general, música y efectos.</li>
+    <li><strong>Efecto CRT</strong> (scanlines + viñeta) activable o desactivable.</li>
+    <li><strong>Escala de la interfaz</strong> de los menús.</li>
+  </ul>
+  <div class="callout">
+    <span class="ctitle">Diseño accesible</span>
+    <p>Ninguna señal crítica depende solo del color: siempre la acompañan una <strong>forma</strong>, un
+      <strong>icono</strong> y <strong>texto</strong>. Hay <em>tooltips</em> en toda la interfaz y pausa
+      táctica contra la IA. La paleta está pensada para ser legible incluso con daltonismo.</p>
+  </div>
+
+  <h2>Todo es procedural</h2>
+  <p>
+    Stellar Combat no usa <strong>ni un solo sprite o archivo de audio externo</strong>: todo se genera en el
+    momento por código. Eso hace que cada partida se vea —y suene— ligeramente distinta.
+  </p>
+  <h3>Arte</h3>
+  <ul>
+    <li><strong>Planetas procedurales</strong> de seis biomas: gigante gaseoso, rocoso, helado, volcánico,
+      oceánico y desértico. Cada combate orbita uno distinto.</li>
+    <li><strong>Fondo espacial</strong> con 3 capas de estrellas en parallax y nebulosas animadas.</li>
+    <li>Estética <strong>retro/pixel-art híbrida</strong>: los fondos se generan a baja resolución y se
+      escalan con filtro <em>nearest</em> para un look pixelado, mientras que naves, efectos e interfaz se
+      dibujan nítidos por legibilidad. El <strong>overlay CRT</strong> remata el aire retro.</li>
+    <li><strong>Efectos</strong> en vivo: tracers de láser, proyectiles con estela, misiles con humo, el
+      barrido del haz, explosiones con anillo y temblor de cámara, el ripple hexagonal del escudo, partículas
+      de fuego y la grieta succionadora de las brechas.</li>
+  </ul>
+  <h3>Audio</h3>
+  <ul>
+    <li><strong>Efectos</strong> sintetizados con WebAudio: el sweep del láser, el <em>thump</em> del gauss, el
+      whoosh+boom del misil, el ping metálico del escudo, las alarmas de O₂ y casco, el salto FTL…</li>
+    <li><strong>Música generativa</strong>: un <em>pad</em> ambiental de acordes lentos con un arpegio
+      pentatónico; la intensidad sube en combate.</li>
+  </ul>
+
+  <hr />
+  <div class="callout ok">
+    <span class="ctitle">¡A volar!</span>
+    <p>Con esto ya conoces todo el juego. Cierra esta pestaña y vuelve a la nave: el sector no se va a cruzar
+      solo. <a href="/">▸ Volver al juego</a></p>
+  </div>
+</Layout>

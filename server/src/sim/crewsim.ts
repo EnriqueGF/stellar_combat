@@ -3,6 +3,7 @@
 import {
   BREACH_SEAL_RATE,
   CREW_CLASSES,
+  CREW_RACES,
   CREW_SPEED_ROOMS_PER_SEC,
   FIRE_FIGHT_RATE,
   MEDBAY_HEAL_PER_LEVEL,
@@ -19,7 +20,8 @@ const XP_PER_10_HP_HEALED = 1
 function moveAlongPath(crew: CrewState, dt: number): void {
   if (crew.path.length === 0) return
   crew.task = 'moving'
-  crew.moveProgress += CREW_SPEED_ROOMS_PER_SEC * dt
+  const speed = CREW_SPEED_ROOMS_PER_SEC * (CREW_RACES[crew.race]?.moveMult ?? 1)
+  crew.moveProgress += speed * dt
   while (crew.moveProgress >= 1 && crew.path.length > 0) {
     const next = crew.path.shift()
     if (next !== undefined) crew.roomId = next
@@ -72,10 +74,11 @@ export function tickCrew(ctx: BattleCtx, side: Side, dt: number): void {
     const room = roomById(ship, crew.roomId)
     const sys = systemInRoom(ship, crew.roomId)
     const cls = CREW_CLASSES[crew.cls]
+    const race = CREW_RACES[crew.race]
 
     if (room && room.fire > 0) {
       crew.task = 'fight_fire'
-      const rate = FIRE_FIGHT_RATE * (cls.fireMult[crew.level - 1] ?? 1)
+      const rate = FIRE_FIGHT_RATE * (cls.fireMult[crew.level - 1] ?? 1) * (race?.fireFightMult ?? 1)
       const put = Math.min(room.fire, rate * dt)
       room.fire -= put
       addXp(ctx, side, crew.id, (put / 10) * XP_PER_10_FIRE)
@@ -84,7 +87,8 @@ export function tickCrew(ctx: BattleCtx, side: Side, dt: number): void {
       room.breach = Math.max(0, room.breach - BREACH_SEAL_RATE * dt)
     } else if (sys && sys.damage > 0 && (room?.breach ?? 0) === 0) {
       crew.task = 'repair'
-      const rate = (1 / REPAIR_SEC_PER_POINT) * (cls.repairMult[crew.level - 1] ?? 1)
+      const rate =
+        (1 / REPAIR_SEC_PER_POINT) * (cls.repairMult[crew.level - 1] ?? 1) * (race?.repairMult ?? 1)
       const repaired = Math.min(sys.damage, rate * dt)
       sys.damage -= repaired
       addXp(ctx, side, crew.id, repaired * XP_PER_REPAIR_POINT)

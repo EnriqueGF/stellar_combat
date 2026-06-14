@@ -174,7 +174,8 @@ HP base 100. Velocidad 1.6 salas/s. Suben de nivel por uso (XP de su acción).
 
 **Auto-tareas** (prioridad GDD: Fuego > Brecha > Reparar > Operar): cada tripulante sin
 orden directa evalúa su sala actual; si no hay nada que hacer, vuelve a su puesto asignado.
-Orden directa del jugador (click tripulante → click sala) tiene prioridad y fija su puesto.
+Orden directa del jugador (selección con clic izq. → clic derecho en una sala) tiene
+prioridad y fija su puesto.
 
 ### 3.7 Huida (GDD §2.1/§2.3)
 

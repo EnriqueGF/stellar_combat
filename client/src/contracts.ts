@@ -166,6 +166,7 @@ export type SfxName =
   | 'explosion'
   | 'shield_hit'
   | 'shield_down'
+  | 'shield_up'
   | 'intercept'
   | 'miss'
   | 'alarm'
@@ -179,6 +180,9 @@ export type SfxName =
   | 'victory'
   | 'defeat'
   | 'door'
+  | 'battle_start'
+  | 'repair'
+  | 'whoosh'
 
 export interface IAudioEngine {
   /** Safe to call before user gesture; queues resume. */

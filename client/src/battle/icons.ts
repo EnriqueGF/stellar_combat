@@ -205,6 +205,58 @@ export function drawDropletCrossed(g: G, cx: number, cy: number, s: number, colo
   g.lineBetween(cx - h, cy + h, cx + h, cy - h)
 }
 
+/** Scrap currency: an amber hex nut (salvaged parts), distinct from the solid drone hexagon. */
+export function drawScrapIcon(g: G, cx: number, cy: number, s: number, color: number): void {
+  const r = s * 0.5
+  const hex = (rr: number): void => {
+    g.beginPath()
+    for (let k = 0; k < 6; k++) {
+      const a = (Math.PI / 3) * k - Math.PI / 6
+      const px = cx + Math.cos(a) * rr
+      const py = cy + Math.sin(a) * rr
+      if (k === 0) g.moveTo(px, py)
+      else g.lineTo(px, py)
+    }
+    g.closePath()
+  }
+  g.fillStyle(color, 0.18)
+  hex(r)
+  g.fillPath()
+  g.lineStyle(Math.max(1.5, s * 0.12), color, 1)
+  hex(r)
+  g.strokePath()
+  g.lineStyle(Math.max(1, s * 0.09), color, 1)
+  g.strokeCircle(cx, cy, r * 0.42)
+}
+
+/** Hull: a delta-wing starship silhouette (nose up, notched tail). */
+export function drawHullIcon(g: G, cx: number, cy: number, s: number, color: number): void {
+  const h = s / 2
+  g.fillStyle(color, 0.25)
+  g.lineStyle(1.5, color, 1)
+  g.beginPath()
+  g.moveTo(cx, cy - h)
+  g.lineTo(cx + h * 0.78, cy + h)
+  g.lineTo(cx, cy + h * 0.45)
+  g.lineTo(cx - h * 0.78, cy + h)
+  g.closePath()
+  g.fillPath()
+  g.strokePath()
+}
+
+/** Evasion: a swerve/dodge double-chevron. */
+export function drawEvasionIcon(g: G, cx: number, cy: number, s: number, color: number): void {
+  const h = s / 2
+  g.lineStyle(Math.max(1.5, s * 0.14), color, 1)
+  for (const dx of [-h * 0.55, h * 0.05]) {
+    g.beginPath()
+    g.moveTo(cx + dx - h * 0.2, cy - h * 0.6)
+    g.lineTo(cx + dx + h * 0.4, cy)
+    g.lineTo(cx + dx - h * 0.2, cy + h * 0.6)
+    g.strokePath()
+  }
+}
+
 export function drawWarnTriangle(g: G, cx: number, cy: number, s: number, color: number): void {
   const h = s / 2
   g.lineStyle(2, color, 1)
@@ -218,11 +270,13 @@ export function drawTaskIcon(g: G, task: CrewTask, cx: number, cy: number, s: nu
   const h = s / 2
   switch (task) {
     case 'repair': {
-      // Wrench: open ring + diagonal handle.
-      g.lineStyle(1.5, color, 1)
-      g.strokeCircle(cx - s * 0.2, cy - s * 0.2, s * 0.3)
-      g.lineStyle(2, color, 1)
-      g.lineBetween(cx - s * 0.02, cy - s * 0.02, cx + h, cy + h)
+      // Hammer: a head block at the top of a diagonal handle.
+      const hx = cx + h * 0.28
+      const hy = cy - h * 0.5
+      g.lineStyle(Math.max(2, s * 0.22), color, 1)
+      g.lineBetween(cx - h * 0.55, cy + h * 0.78, hx, hy)
+      g.fillStyle(color, 1)
+      g.fillRect(hx - s * 0.42, hy - s * 0.2, s * 0.74, s * 0.36)
       break
     }
     case 'fight_fire': {

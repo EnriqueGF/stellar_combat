@@ -19,6 +19,7 @@ import {
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
+import { fadeInScene } from '../ui/transition'
 
 interface NodeStyle {
   color: number
@@ -45,6 +46,8 @@ export class SectorMapScene extends Phaser.Scene {
   create(): void {
     const run = getState().run
     if (!run) {
+      // Defensive bail (no live run): instant, not a fade — this is error
+      // recovery, and a direct start avoids touching the transition guard.
       this.scene.start('MainMenu')
       return
     }
@@ -63,6 +66,7 @@ export class SectorMapScene extends Phaser.Scene {
       this.choosing = false
       this.render()
     })
+    fadeInScene(this)
   }
 
   private render(): void {
@@ -103,6 +107,7 @@ export class SectorMapScene extends Phaser.Scene {
   private renderGraph(dyn: Phaser.GameObjects.Container, run: RunStatePublic): void {
     const current = run.sector.nodes.find((n) => n.id === run.currentNodeId)
     const reachable = new Set<number>(current?.edges ?? [])
+    const revealed = new Set<number>(run.revealedNodeIds)
     const pos = new Map<number, { x: number; y: number }>()
     for (const n of run.sector.nodes) pos.set(n.id, this.nodePosition(n, run))
 
@@ -125,7 +130,16 @@ export class SectorMapScene extends Phaser.Scene {
     for (const n of run.sector.nodes) {
       const p = pos.get(n.id)
       if (!p) continue
-      dyn.add(this.renderNode(n, p, n.id === run.currentNodeId, reachable.has(n.id), n.col < currentCol))
+      dyn.add(
+        this.renderNode(
+          n,
+          p,
+          n.id === run.currentNodeId,
+          reachable.has(n.id),
+          n.col < currentCol,
+          revealed.has(n.id),
+        ),
+      )
     }
   }
 
@@ -135,39 +149,65 @@ export class SectorMapScene extends Phaser.Scene {
     isCurrent: boolean,
     isReachable: boolean,
     isPast: boolean,
+    revealed: boolean,
   ): Phaser.GameObjects.Container {
-    const style = NODE_STYLES[node.type]
     const c = this.add.container(p.x, p.y)
-    const r = node.type === 'boss' ? 30 : 22
+    const r = revealed && node.type === 'boss' ? 30 : 22
+    const accent = revealed ? NODE_STYLES[node.type].color : 0x9fd4f0
 
-    const g = this.add.graphics()
-    g.fillStyle(COLORS.panel, 0.95)
-    g.lineStyle(isCurrent || isReachable ? 2.5 : 1.5, style.color, 1)
-    if (style.shape === 'circle') {
-      g.fillCircle(0, 0, r)
-      g.strokeCircle(0, 0, r)
-    } else if (style.shape === 'square') {
-      g.fillRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7)
-      g.strokeRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7)
-    } else if (style.shape === 'diamond') {
-      const pts = [
-        new Phaser.Math.Vector2(0, -r),
-        new Phaser.Math.Vector2(r, 0),
-        new Phaser.Math.Vector2(0, r),
-        new Phaser.Math.Vector2(-r, 0),
-      ]
-      g.fillPoints(pts, true)
-      g.strokePoints(pts, true)
+    if (revealed) {
+      const style = NODE_STYLES[node.type]
+      const g = this.add.graphics()
+      g.fillStyle(COLORS.panel, 0.95)
+      g.lineStyle(isCurrent || isReachable ? 2.5 : 1.5, style.color, 1)
+      if (style.shape === 'circle') {
+        g.fillCircle(0, 0, r)
+        g.strokeCircle(0, 0, r)
+      } else if (style.shape === 'square') {
+        g.fillRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7)
+        g.strokeRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7)
+      } else if (style.shape === 'diamond') {
+        const pts = [
+          new Phaser.Math.Vector2(0, -r),
+          new Phaser.Math.Vector2(r, 0),
+          new Phaser.Math.Vector2(0, r),
+          new Phaser.Math.Vector2(-r, 0),
+        ]
+        g.fillPoints(pts, true)
+        g.strokePoints(pts, true)
+      } else {
+        const tri = new Phaser.Geom.Triangle(-r, r * 0.8, r, r * 0.8, 0, -r)
+        g.fillTriangleShape(tri)
+        g.strokeTriangleShape(tri)
+      }
+      c.add(g)
+      c.add(this.drawNodeIcon(node.type, style.color))
     } else {
-      const tri = new Phaser.Geom.Triangle(-r, r * 0.8, r, r * 0.8, 0, -r)
-      g.fillTriangleShape(tri)
-      g.strokeTriangleShape(tri)
+      // Undiscovered beacon: a pulsing "?" light, no hint of what it holds.
+      const g = this.add.graphics()
+      g.fillStyle(COLORS.panel, 0.9)
+      g.fillCircle(0, 0, r)
+      g.lineStyle(isReachable ? 2.5 : 1.5, isReachable ? 0x9fd4f0 : 0x6f8aa3, isReachable ? 1 : 0.65)
+      g.strokeCircle(0, 0, r)
+      c.add(g)
+      const glow = this.add.graphics()
+      glow.fillStyle(0x9fd4f0, 0.16)
+      glow.fillCircle(0, 0, r * 0.6)
+      c.add(glow)
+      const q = this.add.text(0, 0, '?', textStyle('title', 22, 0x9fb8cc)).setOrigin(0.5)
+      c.add(q)
+      this.tweens.add({
+        targets: [q, glow],
+        alpha: 0.45,
+        duration: 1100,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      })
     }
-    c.add(g)
-    c.add(this.drawNodeIcon(node.type, style.color))
 
     if (isPast) c.setAlpha(0.35)
-    else if (!isCurrent && !isReachable) c.setAlpha(0.65)
+    else if (!isCurrent && !isReachable) c.setAlpha(revealed ? 0.65 : 0.72)
 
     if (isCurrent) {
       const ring = this.add.graphics()
@@ -187,7 +227,7 @@ export class SectorMapScene extends Phaser.Scene {
 
     if (isReachable) {
       const halo = this.add.graphics()
-      halo.lineStyle(3, style.color, 0.45)
+      halo.lineStyle(3, accent, 0.45)
       halo.strokeCircle(0, 0, r + 7)
       c.add(halo)
       this.tweens.add({ targets: halo, alpha: 0.15, duration: 650, yoyo: true, repeat: -1 })
@@ -205,7 +245,11 @@ export class SectorMapScene extends Phaser.Scene {
         getNet().socket.emit('run:choose_node', node.id)
         // Server replies with battle:start or run:state; routing navigates.
       })
-      Tooltip.attach(hit, () => NODE_TYPE_NAMES_ES[node.type] ?? node.type)
+      Tooltip.attach(hit, () =>
+        revealed
+          ? (NODE_TYPE_NAMES_ES[node.type] ?? node.type)
+          : 'Baliza sin explorar — salta para descubrir qué hay.',
+      )
       c.add(hit)
     }
     return c
@@ -247,7 +291,7 @@ export class SectorMapScene extends Phaser.Scene {
   }
 
   private renderLegend(dyn: Phaser.GameObjects.Container): void {
-    const panel = new Panel(this, 12, GAME_HEIGHT - 76, 880, 64)
+    const panel = new Panel(this, 12, GAME_HEIGHT - 76, 1010, 64)
     dyn.add(panel)
     const entries: { type: NodeType; label: string }[] = [
       { type: 'combat', label: 'Combate' },
@@ -281,8 +325,19 @@ export class SectorMapScene extends Phaser.Scene {
       panel.add(label)
       x += 36 + label.width + 24
     }
+    // Unexplored beacon entry.
+    const unk = this.add.container(x, 32)
+    const ug = this.add.graphics()
+    ug.lineStyle(2, 0x6f8aa3, 1)
+    ug.strokeCircle(0, 0, 9)
+    unk.add(ug)
+    unk.add(this.add.text(0, 0, '?', textStyle('title', 12, 0x9fb8cc)).setOrigin(0.5))
+    panel.add(unk)
+    const unkLabel = this.add.text(x + 16, 24, 'Sin explorar', textStyle('body', 13, COLORS.textDim))
+    panel.add(unkLabel)
+    x += 36 + unkLabel.width + 24
     panel.add(
-      this.add.text(x + 6, 24, '· Elige un nodo conectado para avanzar', textStyle('body', 13, COLORS.text)),
+      this.add.text(x + 6, 24, '· Elige un nodo conectado', textStyle('body', 13, COLORS.text)),
     )
   }
 

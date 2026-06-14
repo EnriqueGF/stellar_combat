@@ -74,7 +74,9 @@ export const BREACH_O2_DRAIN = 3 // %/s in the room
 export const BREACH_SEAL_RATE = 8 // breach % removed per second by one crew
 
 // --- Jump / flee ---
-export const JUMP_CHARGE_SEC = 15
+// Fleeing is a deliberate, costly decision: the FTL drive charges slowly so you
+// can't simply jump out of every fight that turns against you.
+export const JUMP_CHARGE_SEC = 50
 export const COCKPIT_JUMP_MULT = [1, 1.5, 2] as const // by cockpit level
 
 // --- Weapons handling ---
@@ -98,7 +100,9 @@ export const AMBUSH_CHANCE_ON_RECONNECT = 0.25
 
 // --- Expedition ---
 export const SECTOR_COLUMNS = 8
-export const NODE_TYPE_WEIGHTS = { combat: 0.6, elite: 0.15, event: 0.15, shop: 0.1 } as const
+// More narrative events (was combat-heavy at 0.6): expeditions now mix in story
+// nodes so it isn't just back-to-back fights.
+export const NODE_TYPE_WEIGHTS = { combat: 0.46, elite: 0.13, event: 0.28, shop: 0.13 } as const
 export const SCRAP_BASE = 25
 export const SCRAP_RANDOM = 10 // + rand(0..10)
 export const SCRAP_PER_COLUMN = 8

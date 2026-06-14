@@ -72,9 +72,21 @@ test('expedition end-to-end over sockets', async () => {
     assert.equal(intro.col, 1)
     assert.equal(intro.type, 'combat')
 
-    // Choosing the column-1 node starts the guaranteed intro battle.
-    const battleStartP = waitFor(socket, 'battle:start')
+    // Choosing the column-1 node opens the narrated first-contact encounter,
+    // which names the hostile ship before any shooting.
+    const encounterP = waitFor(socket, 'run:state')
     socket.emit('run:choose_node', intro.id)
+    const [enc] = await encounterP
+    assert.ok(enc.event, 'first combat shows a pre-battle encounter')
+    assert.equal(enc.event.combat, true)
+    assert.ok(
+      enc.event.enemyName !== undefined && enc.event.enemyName.length > 0,
+      'the encounter names the enemy ship',
+    )
+
+    // Confirming the encounter ("A las armas") starts the guaranteed intro battle.
+    const battleStartP = waitFor(socket, 'battle:start')
+    socket.emit('run:event_choice', 0)
     const [start] = await battleStartP
     assert.equal(start.mode, 'expedition')
     assert.equal(start.side, 'a')

@@ -3,7 +3,9 @@
 import {
   CREW_CLASSES,
   CREW_XP_PER_LEVEL,
+  crewHpMax,
   DRONES,
+  FIRE_INTENSITY_ON_HIT,
   MAX_AMMO,
   MAX_DRONES_ACTIVE,
   EVASION_CAP,
@@ -12,6 +14,7 @@ import {
   SHIELD_HP_PER_LAYER,
   SHIELD_MAX_LAYERS,
   SHIELD_POWER_PER_LAYER,
+  SHIELD_REGEN_DELAY_SEC,
   SHIPS,
   TRIANGLE_BONUS,
   TRIANGLE_MALUS,
@@ -135,6 +138,13 @@ export function cockpitManned(ship: InternalShip): boolean {
   return ship.crew.some((c) => c.roomId === sys.roomId && c.path.length === 0)
 }
 
+/** True when a living crew member is standing in the engines room (needed to jump). */
+export function engineRoomManned(ship: InternalShip): boolean {
+  const sys = findSystem(ship, 'engines')
+  if (!sys) return false
+  return ship.crew.some((c) => c.hp > 0 && c.roomId === sys.roomId && c.path.length === 0)
+}
+
 export function computeEvasion(ship: InternalShip): number {
   if (!cockpitManned(ship)) return 0
   const engines = findSystem(ship, 'engines')
@@ -228,7 +238,7 @@ export function addXp(ctx: BattleCtx, side: Side, crewId: string, amount: number
     const threshold = CREW_XP_PER_LEVEL[crew.level as 1 | 2]
     if (crew.xp < threshold) break
     crew.level = (crew.level + 1) as 1 | 2 | 3
-    const newMax = CREW_CLASSES[crew.cls].hpMax[crew.level - 1] ?? crew.hpMax
+    const newMax = crewHpMax(crew.cls, crew.race, crew.level)
     crew.hp += Math.max(0, newMax - crew.hpMax)
     crew.hpMax = newMax
     ctx.events.push({ t: 'crew_levelup', side, crewId: crew.id, level: crew.level })
@@ -316,6 +326,23 @@ function assignInitialPower(ship: InternalShip): void {
   give('oxygen', 2)
 }
 
+/** Restores a saved energy distribution (expedition: the player's power layout
+ *  carries over between battles), clamped to the current reactor and usable levels. */
+function applyConfiguredPower(ship: InternalShip, saved: Partial<Record<SystemId, number>>): void {
+  ship.sparePower = ship.reactor
+  for (const id of SYSTEM_ORDER) {
+    const want = saved[id] ?? 0
+    if (want <= 0) continue
+    const sys = findSystem(ship, id)
+    if (!sys) continue
+    const room = Math.min(usableLevel(sys) - sys.power, ship.sparePower, want)
+    if (room > 0) {
+      sys.power += room
+      ship.sparePower -= room
+    }
+  }
+}
+
 /** Station preferences per crew class (first available wins; cockpit is pre-assigned). */
 const STATION_PREFS: Record<string, SystemId[]> = {
   pilot: ['cockpit', 'engines', 'shields'],
@@ -351,7 +378,10 @@ export function buildInternalShip(setup: ShipSetup): InternalShip {
     sparePower: setup.reactor,
     systems,
     rooms: layout.rooms.map((r) => ({ id: r.id, o2: 100, fire: 0, breach: 0 })),
-    doors: layout.doors.map(([a, b], id) => ({ id, a, b, open: true })),
+    // FTL-style: every ship starts fully sealed. Closed doors block O2 diffusion
+    // and fire spread (but never crew movement), so a fire in an unattended room
+    // suffocates on its own. Players/AI open doors deliberately to redistribute air.
+    doors: layout.doors.map(([a, b], id) => ({ id, a, b, open: false })),
     crew: [],
     weapons: setup.weapons.map((weaponId) => ({
       weaponId,
@@ -371,14 +401,17 @@ export function buildInternalShip(setup: ShipSetup): InternalShip {
     shieldLayersMax: 0,
     shieldRegen: 0,
     evasion: 0,
-    jump: { charging: false, progress: 0, blocked: null },
+    jump: { progress: 0, ready: false, blocked: null },
     ammo: setup.ammo,
     ammoMax: MAX_AMMO,
     name: setup.name,
     layout,
     adj,
     shieldHP: 0,
-    sinceShieldHit: 0,
+    // FTL-style: combat starts with shields DOWN and they charge up layer by
+    // layer. Seed the grace timer past the regen delay so charging begins on the
+    // very first tick (the delay only models the pause *after* taking a hit).
+    sinceShieldHit: SHIELD_REGEN_DELAY_SEC,
     fireSpreadTimer: 0,
     boss: setup.boss === true,
     bossPhase2Done: false,
@@ -422,6 +455,7 @@ export function buildInternalShip(setup: ShipSetup): InternalShip {
       id: member.id,
       name: member.name,
       cls: member.cls,
+      race: member.race,
       level: member.level,
       xp: member.xp,
       hp: member.hp,
@@ -434,9 +468,24 @@ export function buildInternalShip(setup: ShipSetup): InternalShip {
     })
   })
 
-  assignInitialPower(ship)
+  if (setup.power && Object.keys(setup.power).length > 0) {
+    applyConfiguredPower(ship, setup.power)
+  } else {
+    assignInitialPower(ship)
+  }
   recomputeShip(ship)
-  ship.shieldHP = ship.shieldLayersMax * SHIELD_HP_PER_LAYER
+  // Shields begin a battle fully DOWN (FTL: they collapse on a jump). They start
+  // charging up immediately — see tickShields + the seeded sinceShieldHit above —
+  // bringing layers back one by one over the first several seconds.
+  ship.shieldHP = 0
   ship.shieldLayers = shieldLayersOf(ship)
+
+  // Pre-combat sneak attack: open the battle with a fire in the weapons room.
+  if (setup.startFire === true) {
+    const roomId = findSystem(ship, 'weapons')?.roomId ?? ship.rooms[1]?.id
+    const room = roomId !== undefined ? roomById(ship, roomId) : undefined
+    if (room) room.fire = FIRE_INTENSITY_ON_HIT
+  }
+
   return ship
 }

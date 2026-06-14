@@ -30,6 +30,7 @@ import {
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
+import { fadeInScene, goToScene } from '../ui/transition'
 
 const SYSTEM_ORDER: SystemId[] = [
   'weapons',
@@ -52,6 +53,7 @@ export class UpgradeScene extends Phaser.Scene {
   create(): void {
     const run = getState().run
     if (!run) {
+      // Defensive bail (no live run): instant error recovery.
       this.scene.start('MainMenu')
       return
     }
@@ -70,6 +72,7 @@ export class UpgradeScene extends Phaser.Scene {
       this.busy = false
       this.render()
     })
+    fadeInScene(this)
   }
 
   private buy(item: UpgradeItem): void {
@@ -222,7 +225,7 @@ export class UpgradeScene extends Phaser.Scene {
     dyn.add(
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 46, 'CONTINUAR', () => {
         getNet().socket.emit('run:continue')
-        this.scene.start('SectorMap')
+        goToScene(this, 'SectorMap')
       }, { width: 280, height: 52 }),
     )
   }

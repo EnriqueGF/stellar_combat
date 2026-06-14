@@ -11,9 +11,11 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../theme'
 import type { ResultSceneData } from '../contracts'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
+import { drawScrapIcon } from '../battle/icons'
 import { addText, formatDuration, menuChrome, textStyle } from '../ui/helpers'
 import { getState } from '../state'
 import { getAudio } from '../audio/engine'
+import { fadeInScene, goToScene } from '../ui/transition'
 
 type Verdict = 'victory' | 'defeat' | 'fled'
 
@@ -39,6 +41,7 @@ export class ResultScene extends Phaser.Scene {
     getAudio().music('menu')
     const result = this.result
     if (!result) {
+      // Defensive bail (no battle result to show): instant error recovery.
       this.scene.start('MainMenu')
       return
     }
@@ -64,6 +67,8 @@ export class ResultScene extends Phaser.Scene {
     this.renderStats(result)
     this.renderRunSummary(verdict)
     this.renderButtons(verdict)
+
+    fadeInScene(this)
   }
 
   private subtitle(result: BattleResult, youWon: boolean): string {
@@ -149,20 +154,47 @@ export class ResultScene extends Phaser.Scene {
     const state = getState()
     const over = state.runOver
     const run = state.run
-    if (verdict !== 'defeat' && over === null) return
 
     const column = over?.column ?? run?.column ?? 0
-    const scrap = over?.scrap ?? run?.scrap ?? 0
+    const totalScrap = Math.round(over?.scrap ?? run?.scrap ?? 0)
+    // Scrap looted in the fight just won (defeat/flee earn none).
+    const gained =
+      verdict === 'victory' && run ? Math.max(0, Math.round(run.scrap - state.scrapAtBattleStart)) : 0
+
     const w = 620
-    const panel = new Panel(this, (GAME_WIDTH - w) / 2, 482, w, 86, {
-      title: over?.victory === true ? 'EXPEDICIÓN COMPLETADA' : 'RESUMEN DE LA EXPEDICIÓN',
+    const panel = new Panel(this, (GAME_WIDTH - w) / 2, 466, w, 106, {
+      title:
+        over?.victory === true
+          ? 'EXPEDICIÓN COMPLETADA'
+          : verdict === 'victory'
+            ? 'BOTÍN'
+            : 'RESUMEN DE LA EXPEDICIÓN',
     })
+
+    // Headline scrap line, always with the chatarra icon.
+    const top = panel.contentTop + 12
+    const g = this.add.graphics()
+    drawScrapIcon(g, 38, top + 11, 24, COLORS.warn)
+    panel.add(g)
+    if (gained > 0) {
+      const plus = this.add.text(60, top, `+${gained}`, textStyle('title', 24, COLORS.ok))
+      panel.add(plus)
+      panel.add(
+        this.add.text(64 + plus.width, top + 7, 'CHATARRA RECUPERADA', textStyle('body', 14, COLORS.textDim)),
+      )
+    } else {
+      const tot = this.add.text(60, top, `${totalScrap}`, textStyle('title', 24, COLORS.warn))
+      panel.add(tot)
+      panel.add(this.add.text(64 + tot.width, top + 7, 'CHATARRA', textStyle('body', 14, COLORS.textDim)))
+    }
     panel.add(
       this.add.text(
         24,
-        panel.contentTop + 8,
-        `Columna alcanzada: ${column}/8 · Chatarra total: ${Math.round(scrap)}`,
-        textStyle('body', 15),
+        top + 42,
+        gained > 0
+          ? `Columna ${column}/8 · Chatarra total: ${totalScrap}`
+          : `Columna alcanzada: ${column}/8`,
+        textStyle('body', 14, COLORS.textDim),
       ),
     )
   }
@@ -173,11 +205,11 @@ export class ResultScene extends Phaser.Scene {
       this.mode === 'expedition' && state.runOver === null && state.run !== null && state.run.alive
     if (runAlive && verdict !== 'defeat') {
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, 'CONTINUAR', () => {
-        this.scene.start('Upgrade')
+        goToScene(this, 'Upgrade')
       }, { width: 280, height: 54 })
     } else {
       new Button(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, 'MENÚ PRINCIPAL', () => {
-        this.scene.start('MainMenu')
+        goToScene(this, 'MainMenu')
       }, { width: 280, height: 54 })
     }
   }

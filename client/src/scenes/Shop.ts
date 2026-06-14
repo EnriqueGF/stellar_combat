@@ -14,6 +14,7 @@ import { addText, buildRunHeader, drawCategoryIcon, menuChrome, textStyle } from
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
+import { fadeInScene } from '../ui/transition'
 
 interface OfferInfo {
   name: string
@@ -62,6 +63,7 @@ export class ShopScene extends Phaser.Scene {
   create(): void {
     const run = getState().run
     if (!run || run.shopOffers === null) {
+      // Defensive bail (no active shop): instant error recovery.
       this.scene.start(run ? 'SectorMap' : 'MainMenu')
       return
     }
@@ -80,6 +82,7 @@ export class ShopScene extends Phaser.Scene {
       this.busy = false
       this.render()
     })
+    fadeInScene(this)
   }
 
   private render(): void {

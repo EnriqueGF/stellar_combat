@@ -1,0 +1,81 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Eventos y encuentros" current="eventos/" lede="Las historias del sector: eventos de texto con decisiones arriesgadas y encuentros que deciden cómo empieza —o si empieza— un combate.">
+  <p>
+    No todo es disparar. Los <strong>nodos de evento</strong> te plantan ante una situación con varias
+    opciones y resultados al azar; los <strong>encuentros</strong> preceden a cada combate y te dejan elegir
+    cómo afrontarlo. Ambos usan la misma pantalla de decisión.
+  </p>
+
+  <Figure src="screenshots/event.png" alt="Pantalla de evento con opciones" caption="Una decisión típica: lees la situación y eliges. El resultado puede darte chatarra, herirte o sorprenderte." />
+
+  <h2>Cómo funcionan los eventos</h2>
+  <p>
+    Eliges una opción y se resuelve con pesos de probabilidad: puede darte <strong>chatarra</strong>, costarte
+    <strong>casco</strong>, herir a un <strong>tripulante</strong>, prender un <strong>incendio</strong>,
+    regalarte un <strong>arma</strong>, darte <strong>munición</strong>… o nada. La opción «prudente» casi
+    siempre es segura pero sin recompensa; la «arriesgada» reparte premio y castigo. Tú decides cuánto
+    apostar según el estado de tu nave.
+  </p>
+
+  <h3>Catálogo de eventos</h3>
+  <div class="grid cols-2">
+    <div class="card"><h3>Nave a la deriva</h3><p class="desc">Un carguero sin energía: su bodega puede tener chatarra… o ser una trampa que prende fuego a bordo.</p></div>
+    <div class="card"><h3>Señal de socorro</h3><p class="desc">Una cápsula pide rescate. Acudir suele pagar bien, pero podría ser un cebo pirata.</p></div>
+    <div class="card"><h3>Peaje pirata</h3><p class="desc">Una corsaria exige 10 de chatarra. Paga y pasa, o niégate y arriésgate a la persecución.</p></div>
+    <div class="card"><h3>Campo de asteroides</h3><p class="desc">Atravesar el cinturón recolectando mineral ahorra tiempo, pero un fragmento puede golpear el casco.</p></div>
+    <div class="card"><h3>Estación abandonada</h3><p class="desc">Un muelle presurizado: quizá un arma operativa, quizá chatarra, quizá un mamparo que hiere a tu gente.</p></div>
+    <div class="card"><h3>Mercader errante</h3><p class="desc">Un bazar vende 4 misiles por 8 de chatarra. Reabastecer a buen precio.</p></div>
+    <div class="card"><h3>Tormenta iónica</h3><p class="desc">Cruzarla ahorra combustible, pero un rayo puede electrocutar a un tripulante.</p></div>
+    <div class="card"><h3>Restos de batalla</h3><p class="desc">Dos cruceros destrozados: buena cosecha de chatarra, con riesgo de que un reactor dañado detone cerca.</p></div>
+    <div class="card"><h3>Sonda alienígena</h3><p class="desc">Un artefacto exótico. Estudiarlo de cerca puede valer una fortuna… o descargar una defensa contra tu tripulante.</p></div>
+    <div class="card"><h3>Convoy de refugiados</h3><p class="desc">Donar suministros (−10 chatarra) puede granjearte un arma de regalo y la sonrisa de la tripulación.</p></div>
+    <div class="card"><h3>Alijo de contrabandistas</h3><p class="desc">Un contenedor sellado de un cártel: chatarra y munición de primera, o una carga trampa.</p></div>
+    <div class="card"><h3>Médico a la deriva</h3><p class="desc">Un cirujano aterido. Subirlo a bordo cura a tu tripulación o te paga el rescate.</p></div>
+    <div class="card"><h3>Tirachinas gravitatorio</h3><p class="desc">Rozar los anillos del gigante gaseoso recolecta hielo metálico, con riesgo de que el casco cruja.</p></div>
+    <div class="card"><h3>IA huérfana</h3><p class="desc">El núcleo de una IA suplica ser liberado. Trasplantarlo puede optimizar tu tiro… o freír a quien la instale.</p></div>
+    <div class="card"><h3>Boya del gremio minero</h3><p class="desc">Un contrato relámpago: paga una comisión por adelantado a cambio de marcar un filón cercano.</p></div>
+  </div>
+
+  <hr />
+
+  <h2>Cómo funcionan los encuentros de combate</h2>
+  <p>Antes de pelear, el encuentro te ofrece distintas vías. Hay cuatro tipos de acción:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Acción</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag-pill danger">Combatir</span></td><td>Empieza el combate de frente, sin más.</td></tr>
+        <tr><td><span class="tag-pill warn">Sorpresa</span></td><td>Tirada: si sale bien, el enemigo empieza <strong>dañado y en llamas</strong>; si falla, combate normal.</td></tr>
+        <tr><td><span class="tag-pill">Eludir</span></td><td>Tirada: si sale bien, <strong>te saltas el combate</strong> (sin botín); si falla, peleas igual.</td></tr>
+        <tr><td><span class="tag-pill ok">Peaje</span></td><td>Pagas chatarra para evitar el combate por completo (solo si puedes permitírtelo).</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Cada encuentro ofrece una combinación distinta de estas opciones, con probabilidades propias.
+    Un ataque por sorpresa que sale bien es una ventaja enorme; eludir te ahorra daño pero también el premio.</p>
+
+  <h3>Catálogo de encuentros</h3>
+  <div class="grid cols-2">
+    <div class="card"><h3>Contacto hostil</h3><p class="desc">Una nave vira hacia ti al salir del salto. Cargar de frente, rodear y atacar por sorpresa, o intentar eludir.</p></div>
+    <div class="card"><h3>Bloqueo de la Hegemonía</h3><p class="desc">Un patrullero exige tu carga. Responder con las armas, pagar el peaje o fingir avería y disparar.</p></div>
+    <div class="card"><h3>Cazarrecompensas</h3><p class="desc">Te persigue por tu casco. Plantar cara, forzar el salto para despistarlo o tenderle una emboscada.</p></div>
+    <div class="card"><h3>Emboscada pirata</h3><p class="desc">Tres corsarios te caen encima. Defenderte o arrojarles parte de la carga como cebo para escapar.</p></div>
+    <div class="card"><h3>Saqueador a la deriva</h3><p class="desc">Un «pecio» que enciende motores. Adelantarte a atacar, combatir o retirarte con cautela.</p></div>
+    <div class="card"><h3>Patrulla automatizada</h3><p class="desc">Un dron de combate implacable. Destruirlo o burlar su rutina de barrido.</p></div>
+    <div class="card"><h3>Mercenaria rival</h3><p class="desc">Otra cazadora reclama el sector. Aceptar el duelo, cegarla con señuelos o pagarle paso franco.</p></div>
+    <div class="card"><h3>Socorro o cebo</h3><p class="desc">Un mercante con los tubos de misiles abiertos. Adelantarte a su traición, seguirle el juego o rodear y largarte.</p></div>
+    <div class="card"><h3>Asaltante malherido</h3><p class="desc">Una nave herida y desesperada. Rematarla o apuntar a sus heridas para caer sobre ella con ventaja.</p></div>
+    <div class="card"><h3>Depredador en la tormenta</h3><p class="desc">Un cazador acecha entre relámpagos iónicos. Disparar a las sombras o usar la tormenta para desaparecer.</p></div>
+  </div>
+
+  <div class="callout">
+    <span class="ctitle">Y los inevitables</span>
+    <p>El <strong>primer combate</strong> de toda run («Primer contacto», un chatarrero) y el
+      <strong>jefe</strong> («El Acorazado Hegemón») tienen un encuentro de una sola opción: a las armas. No
+      hay forma de eludirlos.</p>
+  </div>
+</Layout>

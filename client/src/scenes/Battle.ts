@@ -25,6 +25,7 @@ import type {
 import { getAudio } from '../audio/engine'
 import { getNet, scOn } from '../net/socket'
 import { getState } from '../state'
+import { fadeInScene, goToScene } from '../ui/transition'
 import { SpaceBackdrop } from '../vfx/backdrop'
 import { ShieldBubble } from '../vfx/shield'
 import { CrtOverlay } from '../vfx/crt'
@@ -34,6 +35,7 @@ import { CombatLog } from '../battle/combatLog'
 import { BattleEventRouter } from '../battle/eventFx'
 import { BottomHud } from '../battle/hud'
 import { CrewPortraits } from '../battle/portraits'
+import { EnemyReadout } from '../battle/enemyReadout'
 import { Readouts } from '../battle/readouts'
 import { ShipView } from '../battle/shipView'
 import { TargetingController } from '../battle/targeting'
@@ -42,6 +44,8 @@ import { Toast, Tooltip } from '../battle/uiKit'
 import { EscapeMenu } from '../ui/escapeMenu'
 
 const BIOMES: PlanetBiome[] = ['gas_giant', 'rocky', 'ice', 'volcanic', 'oceanic', 'desert']
+/** Cadence of the repair clank while a crew member works on a system. */
+const REPAIR_SOUND_INTERVAL_MS = 2200
 
 export class BattleScene extends Phaser.Scene {
   private start!: BattleStartMsg
@@ -59,12 +63,18 @@ export class BattleScene extends Phaser.Scene {
   private hud!: BottomHud
   private portraits!: CrewPortraits
   private readouts!: Readouts
+  private enemyReadout!: EnemyReadout
   private log!: CombatLog
   private targeting!: TargetingController
   private tutorial!: TutorialController
   private router!: BattleEventRouter
 
   private pauseOverlay: Phaser.GameObjects.Container | null = null
+  /** Drives the periodic clank while any crew (either ship) is repairing a system. */
+  private repairSoundTimer = 0
+  /** Last seen shield-layer counts, to detect regen (gain) vs loss across snapshots. */
+  private prevPlayerLayers = 0
+  private prevEnemyLayers = 0
   private created = false
   private ended = false
   private fledByMe = false
@@ -91,7 +101,7 @@ export class BattleScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => {
       // The tutorial is practice: skip the Result screen and return to the menu.
       if (this.start.mode === 'tutorial') {
-        this.scene.start('MainMenu')
+        goToScene(this, 'MainMenu')
         return
       }
       const run = this.store.run
@@ -106,7 +116,7 @@ export class BattleScene extends Phaser.Scene {
           !bossNode &&
           (result.winner === yourSide || (result.reason === 'fled' && this.fledByMe)),
       }
-      this.scene.start('Result', data)
+      goToScene(this, 'Result', data)
     })
   }
 
@@ -121,6 +131,10 @@ export class BattleScene extends Phaser.Scene {
     this.created = false
     this.ended = false
     this.fledByMe = false
+    // Baseline shield layers from the opening snapshot (shields start down), so the
+    // first real snapshot doesn't false-trigger the charge blip.
+    this.prevPlayerLayers = this.snap.you.shieldLayers
+    this.prevEnemyLayers = this.snap.enemy.shieldLayers
   }
 
   create(): void {
@@ -137,6 +151,7 @@ export class BattleScene extends Phaser.Scene {
     this.backdrop = new SpaceBackdrop(this, seed, biome, { planetX: 950, planetY: 260 })
 
     audio.music('battle')
+    audio.play('battle_start')
 
     // --- ships + shields ---
     this.playerView = new ShipView(this, HUD.playerShipRect, this.snap.you, {
@@ -164,6 +179,9 @@ export class BattleScene extends Phaser.Scene {
     // --- HUD widgets ---
     this.log = new CombatLog(this)
     this.readouts = new Readouts(this, audio)
+    // Expedition: scrap stash shown at the top of the vital-stats panel (FTL-style).
+    this.readouts.setScrap(this.start.mode === 'expedition' ? (this.store.run?.scrap ?? 0) : null)
+    this.enemyReadout = new EnemyReadout(this, this.snap.enemy)
     this.portraits = new CrewPortraits(this, this.snap.you.crew, {
       onSelect: (crewId) => this.targeting.selectCrew(crewId),
       onDeselect: () => this.targeting.clearSelection(),
@@ -176,9 +194,9 @@ export class BattleScene extends Phaser.Scene {
         audio,
         fleeTooltip:
           this.start.mode === 'expedition'
-            ? 'Huir: pierdes el botín del nodo.\nRequiere cabina tripulada y motores con energía.'
+            ? 'Huir: pierdes el botín del nodo.\nEl salto se carga solo; para huir necesitas un tripulante en la sala de motores.'
             : this.start.mode === 'tutorial'
-              ? 'Huir: termina la práctica.\nRequiere cabina tripulada y motores con energía.'
+              ? 'Huir: termina la práctica.\nEl salto se carga solo; para huir necesitas un tripulante en la sala de motores.'
               : 'Huir: en Duelo cuenta como rendición.',
       },
       {
@@ -304,6 +322,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.created = true
     this.applySnapshot(this.snap)
+
+    fadeInScene(this)
   }
 
   // -------------------------------------------------------------------------
@@ -322,12 +342,16 @@ export class BattleScene extends Phaser.Scene {
   private jumpClicked(): void {
     if (this.ended || this.escapeMenu.isOpen) return
     const jump = this.snap.you.jump
-    if (jump.charging) {
-      this.net.socket.emit('battle:jump', false)
+    if (!jump.ready) {
+      Toast.show('El salto aún se está cargando.')
+      return
+    }
+    if (jump.blocked === 'no_crew') {
+      Toast.show('Necesitas un tripulante en la sala de motores para saltar.')
       return
     }
     const engage = (): void => {
-      this.net.socket.emit('battle:jump', true)
+      this.net.socket.emit('battle:jump')
     }
     // First jump of an expedition asks to confirm losing the node loot.
     if (this.start.mode === 'expedition' && this.tutorial.requestJumpConfirm(engage)) return
@@ -348,13 +372,36 @@ export class BattleScene extends Phaser.Scene {
     this.enemyView.apply(snap.enemy)
     this.playerBubble.setLayers(snap.you.shieldLayers, snap.you.shieldLayersMax)
     this.enemyBubble.setLayers(snap.enemy.shieldLayers, snap.enemy.shieldLayersMax)
+    // A regained shield layer plays a rising "charge" blip (once per layer gained).
+    // Losses are handled event-side (shield_down sfx + bubble collapse flash), so
+    // here we only react to GAINS to avoid doubling the drop feedback.
+    this.detectShieldGains(snap)
     this.hud.apply(snap.you)
     this.portraits.apply(snap.you.crew)
     this.readouts.apply(snap.you)
+    this.enemyReadout.apply(snap.enemy)
     this.targeting.refresh(snap.you)
     // While the tutorial is up the auto-pause is implied by its own dim overlay,
-    // so don't also show the PAUSA TÁCTICA banner (they'd overlap near the top).
+    // so don't also show the PAUSA TÁCTICA banner (avoid stacking two "paused" cues).
     this.pauseOverlay?.setVisible(snap.paused && !this.tutorial.active)
+  }
+
+  /** Plays the rising shield "charge" blip once per layer regained (snapshot diff). */
+  private detectShieldGains(snap: BattleSnapshot): void {
+    const audio = getAudio()
+    const playerGain = snap.you.shieldLayers - this.prevPlayerLayers
+    for (let i = 0; i < playerGain; i++) {
+      // Step the detune up per stacked layer so a quick multi-layer recharge reads
+      // as an ascending arpeggio rather than the same blip twice.
+      audio.play('shield_up', { detune: i * 120 })
+    }
+    this.prevPlayerLayers = snap.you.shieldLayers
+
+    const enemyGain = snap.enemy.shieldLayers - this.prevEnemyLayers
+    for (let i = 0; i < enemyGain; i++) {
+      audio.play('shield_up', { volume: 0.32, detune: 200 + i * 120 })
+    }
+    this.prevEnemyLayers = snap.enemy.shieldLayers
   }
 
   // -------------------------------------------------------------------------
@@ -374,18 +421,30 @@ export class BattleScene extends Phaser.Scene {
     g.lineStyle(2, COLORS.shield, 0.6)
     g.strokeRect(3, 3, GAME_WIDTH - 6, GAME_HEIGHT - 6)
 
+    // Banner at the BOTTOM, in the clear strip just above the bottom HUD bar
+    // (BAR_Y = 585). Centred horizontally so it clears the controls below it and
+    // sits to the right of the player-ship alert banners on the left.
+    const bannerW = 320
+    const bannerH = 42
+    const bannerX = GAME_WIDTH / 2 - bannerW / 2
+    const bannerY = 540
     const bannerBg = this.add.graphics()
     bannerBg.fillStyle(COLORS.panel, 0.92)
-    bannerBg.fillRoundedRect(GAME_WIDTH / 2 - 150, 60, 300, 48, 8)
+    bannerBg.fillRoundedRect(bannerX, bannerY, bannerW, bannerH, 8)
     bannerBg.lineStyle(2, COLORS.shield, 0.9)
-    bannerBg.strokeRoundedRect(GAME_WIDTH / 2 - 150, 60, 300, 48, 8)
-    const title = makeTitleText(this, GAME_WIDTH / 2, 76, 'PAUSA TÁCTICA', 19, COLORS_CSS.shield).setOrigin(
-      0.5,
-    )
+    bannerBg.strokeRoundedRect(bannerX, bannerY, bannerW, bannerH, 8)
+    const title = makeTitleText(
+      this,
+      GAME_WIDTH / 2,
+      bannerY + 14,
+      'PAUSA TÁCTICA',
+      18,
+      COLORS_CSS.shield,
+    ).setOrigin(0.5)
     const sub = makeText(
       this,
       GAME_WIDTH / 2,
-      96,
+      bannerY + 31,
       'Puedes apuntar, mover energía y dar órdenes',
       10,
       COLORS_CSS.textDim,
@@ -422,7 +481,7 @@ export class BattleScene extends Phaser.Scene {
         lines.push(
           isEnemy
             ? 'Con un arma seleccionada: click fija el objetivo'
-            : 'Con un tripulante seleccionado: click lo envía aquí',
+            : 'Con tripulantes seleccionados: clic derecho los envía aquí',
         )
         return lines.join('\n')
       })
@@ -442,8 +501,30 @@ export class BattleScene extends Phaser.Scene {
     this.readouts.update(time)
     this.log.update(time)
     this.backdrop?.update(delta)
+    this.tickRepairSound(delta)
     if (this.pauseOverlay !== null && this.pauseOverlay.visible) {
       this.pauseOverlay.setAlpha(0.85 + 0.15 * Math.sin(time / 350))
+    }
+  }
+
+  /** Plays a repair clank every few seconds while any crew member is repairing. */
+  private tickRepairSound(dtMs: number): void {
+    const repairing =
+      !this.ended &&
+      !this.snap.paused &&
+      (this.snap.you.crew.some((c) => c.hp > 0 && c.task === 'repair') ||
+        this.snap.enemy.crew.some((c) => c.hp > 0 && c.task === 'repair'))
+    if (!repairing) {
+      this.repairSoundTimer = 0
+      return
+    }
+    this.repairSoundTimer += dtMs
+    if (this.repairSoundTimer >= REPAIR_SOUND_INTERVAL_MS) {
+      this.repairSoundTimer = 0
+      getAudio().play('repair', { volume: 0.55 })
+      // Spark each repairing crew member in time with the "tock" so the sound reads.
+      this.playerView.sparkRepairs()
+      this.enemyView.sparkRepairs()
     }
   }
 
@@ -454,6 +535,7 @@ export class BattleScene extends Phaser.Scene {
     this.hud.destroy()
     this.portraits.destroy()
     this.readouts.destroy()
+    this.enemyReadout.destroy()
     this.log.destroy()
     this.playerBubble.destroy()
     this.enemyBubble.destroy()

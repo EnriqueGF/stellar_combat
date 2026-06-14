@@ -10,6 +10,8 @@ import Phaser from 'phaser'
 import {
   CREW_CLASSES,
   CREW_CLASS_IDS,
+  CREW_RACES,
+  CREW_RACE_IDS,
   DEFENSE_MODULES,
   DEFENSE_MODULE_IDS,
   DRONES,
@@ -21,10 +23,13 @@ import {
   WEAPON_BUDGET_POINTS,
   WEAPON_IDS,
   WEAPONS,
+  defaultRaceForIndex,
   validateLoadout,
 } from '@stellar/shared'
-import type { CrewClassId, Loadout, ShipClassId, WeaponId } from '@stellar/shared'
+import type { CrewClassId, CrewRaceId, Loadout, ShipClassId, WeaponId } from '@stellar/shared'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, catColor } from '../theme'
+import { CLASS_COLORS } from '../battle/common'
+import { drawRaceBody } from '../battle/crewArt'
 import type { LoadoutSceneData } from '../contracts'
 import { Button } from '../ui/button'
 import { Panel } from '../ui/panel'
@@ -42,6 +47,7 @@ import {
 } from '../ui/helpers'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
+import { fadeInScene, goToScene } from '../ui/transition'
 
 function defaultLoadout(ship: ShipClassId): Loadout {
   if (ship !== 'hegemon') {
@@ -119,7 +125,7 @@ export class LoadoutScene extends Phaser.Scene {
 
     new Button(this, 1205, 24, 'VOLVER', () => {
       getNet().socket.emit('queue:leave')
-      this.scene.start('MainMenu')
+      goToScene(this, 'MainMenu')
     }, { width: 120, height: 36, fontSize: 14, variant: 'ghost' })
 
     scOn(this, 'queue:waiting', (seconds: number, npcOffer: boolean) => {
@@ -127,12 +133,14 @@ export class LoadoutScene extends Phaser.Scene {
     })
 
     this.render()
+    fadeInScene(this)
   }
 
   // ------------------------------------------------------------------ render
 
   private render(): void {
     if (this.dyn) this.dyn.destroy()
+    this.ensureRaces()
     const dyn = this.add.container(0, 0)
     this.dyn = dyn
 
@@ -406,13 +414,37 @@ export class LoadoutScene extends Phaser.Scene {
     }
   }
 
+  private raceAt(i: number): CrewRaceId {
+    return this.loadout.crewRaces?.[i] ?? defaultRaceForIndex(i)
+  }
+
+  /** Materialise crewRaces so the player's picks are sent (presets omit them). */
+  private ensureRaces(): void {
+    this.loadout.crewRaces = this.loadout.crew.map((_, i) => this.raceAt(i))
+  }
+
   private renderCrew(dyn: Phaser.GameObjects.Container): void {
-    const panel = new Panel(this, 692, 310, 576, 246, { title: 'TRIPULACIÓN — 4 especialistas' })
+    const panel = new Panel(this, 692, 310, 576, 246, { title: 'TRIPULACIÓN — clase · especie' })
     dyn.add(panel)
     const baseY = 310 + panel.contentTop + 4
+
+    const arrow = (row: Phaser.GameObjects.Container, x: number, ch: string, fn: () => void): void => {
+      const t = this.add
+        .text(x, 22, ch, textStyle('title', 19, COLORS.panelBorder))
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+      t.on('pointerover', () => getAudio().play('hover'))
+      t.on('pointerdown', () => {
+        if (!this.queued) fn()
+      })
+      row.add(t)
+    }
+
     for (let i = 0; i < 4; i++) {
       const cls = this.loadout.crew[i] ?? 'pilot'
       const def = CREW_CLASSES[cls]
+      const race = this.raceAt(i)
+      const raceDef = CREW_RACES[race]
       const rowY = baseY + i * 50
       const row = this.add.container(702, rowY)
       const bg = this.add.graphics()
@@ -421,28 +453,26 @@ export class LoadoutScene extends Phaser.Scene {
       bg.lineStyle(1, COLORS.textDim, 0.4)
       bg.strokeRoundedRect(0, 0, 556, 44, 4)
       row.add(bg)
-      row.add(this.add.text(10, 22, `Puesto ${i + 1}`, textStyle('body', 12, COLORS.textDim)).setOrigin(0, 0.5))
+      row.add(this.add.text(10, 22, `${i + 1}`, textStyle('title', 13, COLORS.textDim)).setOrigin(0.5))
 
-      const prev = this.add
-        .text(120, 22, '<', textStyle('title', 20, COLORS.panelBorder))
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-      prev.on('pointerdown', () => {
-        if (this.queued) return
-        this.cycleCrew(i, -1)
-      })
-      const next = this.add
-        .text(330, 22, '>', textStyle('title', 20, COLORS.panelBorder))
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-      next.on('pointerdown', () => {
-        if (this.queued) return
-        this.cycleCrew(i, 1)
-      })
-      const name = this.add.text(225, 22, def.name, textStyle('title', 15)).setOrigin(0.5)
-      Tooltip.attach(name.setInteractive(), () => def.desc)
-      row.add([prev, next, name])
-      row.add(this.add.text(360, 22, def.desc, { ...textStyle('body', 11, COLORS.textDim), wordWrap: { width: 190 } }).setOrigin(0, 0.5))
+      // Class cycler.
+      arrow(row, 36, '<', () => this.cycleCrew(i, -1))
+      const cName = this.add.text(112, 22, def.name, textStyle('title', 14, CLASS_COLORS[cls])).setOrigin(0.5)
+      Tooltip.attach(cName.setInteractive(), () => `${def.name} — ${def.desc}`)
+      row.add(cName)
+      arrow(row, 188, '>', () => this.cycleCrew(i, 1))
+
+      // Race (species) cycler.
+      arrow(row, 240, '<', () => this.cycleRace(i, -1))
+      const rName = this.add.text(330, 22, raceDef.name, textStyle('title', 14, raceDef.color)).setOrigin(0.5)
+      Tooltip.attach(rName.setInteractive(), () => `${raceDef.name} — ${raceDef.desc}`)
+      row.add(rName)
+      arrow(row, 420, '>', () => this.cycleRace(i, 1))
+
+      // Token preview (same art as the in-ship token).
+      const token = this.add.graphics().setPosition(486, 22)
+      drawRaceBody(token, race, cls, 13)
+      row.add(token)
       dyn.add(row)
     }
   }
@@ -453,6 +483,18 @@ export class LoadoutScene extends Phaser.Scene {
     const nextIdx = (idx + dir + CREW_CLASS_IDS.length) % CREW_CLASS_IDS.length
     const next: CrewClassId = CREW_CLASS_IDS[nextIdx] ?? 'pilot'
     this.loadout.crew[slot] = next
+    getAudio().play('click')
+    this.render()
+  }
+
+  private cycleRace(slot: number, dir: 1 | -1): void {
+    this.ensureRaces()
+    const races = this.loadout.crewRaces
+    if (!races) return
+    const current = races[slot] ?? defaultRaceForIndex(slot)
+    const idx = CREW_RACE_IDS.indexOf(current)
+    const nextIdx = (idx + dir + CREW_RACE_IDS.length) % CREW_RACE_IDS.length
+    races[slot] = CREW_RACE_IDS[nextIdx] ?? 'human'
     getAudio().play('click')
     this.render()
   }
@@ -510,6 +552,7 @@ export class LoadoutScene extends Phaser.Scene {
 
   private submit(): void {
     if (this.queued) return
+    this.ensureRaces()
     const v = validateLoadout(this.loadout)
     if (!v.ok) {
       Toast.show(v.errors[0] ?? 'Loadout no válido.', 'error')

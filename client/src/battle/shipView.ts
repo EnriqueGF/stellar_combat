@@ -17,15 +17,8 @@ import {
   type SystemState,
 } from '@stellar/shared'
 import { COLORS } from '../theme'
-import {
-  CLASS_COLORS,
-  CLASS_INITIALS,
-  chaikin,
-  hashString,
-  makeText,
-  type Rect,
-  type Vec2,
-} from './common'
+import { chaikin, hashString, makeText, type Rect, type Vec2 } from './common'
+import { drawRaceBody } from './crewArt'
 import {
   drawCrossOut,
   drawDropletCrossed,
@@ -61,7 +54,6 @@ const HULL_STYLES: Record<ShipClassId, HullStyle> = {
 interface CrewToken {
   container: Phaser.GameObjects.Container
   base: Phaser.GameObjects.Graphics
-  initial: Phaser.GameObjects.Text
   hpBar: Phaser.GameObjects.Graphics
   taskGfx: Phaser.GameObjects.Graphics
   ring: Phaser.GameObjects.Graphics
@@ -120,6 +112,8 @@ export class ShipView {
   private readonly onToggleDoor?: (doorId: number) => void
   /** Cached pixel placement per door id (rooms never move). */
   private readonly doorGeo = new Map<number, { x: number; y: number; vertical: boolean; half: number }>()
+  /** Doorway pixel point keyed by unordered room pair, so crew walk THROUGH doors. */
+  private readonly doorByRoomPair = new Map<string, Vec2>()
   /** Animated openness per door id: 0 = shut, 1 = fully slid open. */
   private readonly doorFrac = new Map<number, number>()
   private doorsAnimating = false
@@ -135,7 +129,7 @@ export class ShipView {
   private iconDirty = true
   private fireTimer = 0
   private breachTimer = 0
-  private selectedCrewId: string | null = null
+  private selectedCrewIds = new Set<string>()
   private destroyed = false
 
   constructor(scene: Phaser.Scene, rect: Rect, initial: ShipState, opts: ShipViewOpts) {
@@ -252,6 +246,7 @@ export class ShipView {
       const geo = this.doorGeometry(door)
       if (geo === null) continue
       this.doorGeo.set(door.id, geo)
+      this.doorByRoomPair.set(roomPairKey(door.a, door.b), { x: geo.x, y: geo.y })
       this.doorFrac.set(door.id, door.open ? 1 : 0)
       if (this.onToggleDoor) {
         const id = door.id
@@ -391,8 +386,8 @@ export class ShipView {
     return {
       cx: this.originX + this.bodyW / 2 + this.facing * this.noseLen * 0.2,
       cy: this.originY + this.bodyH / 2,
-      rx: (this.bodyW + this.noseLen + this.tailLen) / 2 + 20,
-      ry: this.bodyH / 2 + this.cell * 0.85,
+      rx: (this.bodyW + this.noseLen + this.tailLen) / 2 + 28,
+      ry: this.bodyH / 2 + this.cell * 1.05,
     }
   }
 
@@ -727,11 +722,65 @@ export class ShipView {
   // Crew tokens
   // -------------------------------------------------------------------------
 
-  setCrewSelected(crewId: string | null): void {
-    this.selectedCrewId = crewId
+  setCrewSelected(ids: Iterable<string> | null): void {
+    this.selectedCrewIds = new Set(ids ?? [])
     for (const [id, token] of this.tokens) {
-      token.ring.setVisible(id === crewId)
+      token.ring.setVisible(this.selectedCrewIds.has(id))
     }
+  }
+
+  /** Whether a world point lands on one of this ship's door hit zones (so a click
+   *  toggles the door rather than moving crew into the adjacent room). */
+  doorAtWorld(x: number, y: number): boolean {
+    const half = this.cell * 0.32
+    for (const geo of this.doorGeo.values()) {
+      if (Math.abs(x - geo.x) <= half && Math.abs(y - geo.y) <= half) return true
+    }
+    return false
+  }
+
+  /** Room id whose pixel rect contains a world point, or null. */
+  roomAtWorld(x: number, y: number): number | null {
+    for (const r of this.rooms) {
+      const rr = this.roomRect(r.id)
+      if (rr && x >= rr.x && x <= rr.x + rr.w && y >= rr.y && y <= rr.y + rr.h) return r.id
+    }
+    return null
+  }
+
+  /** Living crew id whose token sits under a world point (within grab radius), or null. */
+  crewAtWorld(x: number, y: number): string | null {
+    let best: string | null = null
+    // Tight grab radius so clicking elsewhere in a room (to move there) is not
+    // swallowed as a re-select of a nearby token.
+    let bestD = (TOKEN_RADIUS + 2) * (TOKEN_RADIUS + 2)
+    for (const [id, token] of this.tokens) {
+      if (token.lastDead) continue
+      const dx = token.container.x - x
+      const dy = token.container.y - y
+      const d = dx * dx + dy * dy
+      if (d < bestD) {
+        bestD = d
+        best = id
+      }
+    }
+    return best
+  }
+
+  /** Living crew ids whose tokens fall inside a world-space selection rectangle. */
+  crewInRect(x0: number, y0: number, x1: number, y1: number): string[] {
+    const minX = Math.min(x0, x1)
+    const maxX = Math.max(x0, x1)
+    const minY = Math.min(y0, y1)
+    const maxY = Math.max(y0, y1)
+    const out: string[] = []
+    for (const [id, token] of this.tokens) {
+      if (token.lastDead) continue
+      const px = token.container.x
+      const py = token.container.y
+      if (px >= minX && px <= maxX && py >= minY && py <= maxY) out.push(id)
+    }
+    return out
   }
 
   flashCrew(crewId: string, color: number): void {
@@ -750,6 +799,36 @@ export class ShipView {
       ease: 'Quad.easeOut',
       onComplete: () => flash.destroy(),
     })
+  }
+
+  /** Brief shower of sparks on every crew member currently repairing a system,
+   *  fired in time with the repair "tock" so the sound clearly reads as hammering. */
+  sparkRepairs(): void {
+    for (const [id, token] of this.tokens) {
+      const member = this.state.crew.find((c) => c.id === id)
+      if (member === undefined || member.hp <= 0 || member.task !== 'repair') continue
+      const ox = token.container.x + TOKEN_RADIUS * 0.5
+      const oy = token.container.y - TOKEN_RADIUS * 0.5
+      const g = this.scene.add.graphics().setPosition(ox, oy)
+      const n = 5
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i - (n - 1) / 2) * 0.55
+        const len = 3 + (i % 2) * 2
+        g.lineStyle(1.5, i % 2 === 0 ? COLORS.energy : 0xffffff, 1)
+        g.lineBetween(0, 0, Math.cos(a) * len, Math.sin(a) * len)
+      }
+      g.fillStyle(COLORS.energy, 1)
+      g.fillCircle(0, 0, 1.6)
+      this.container.add(g)
+      this.scene.tweens.add({
+        targets: g,
+        y: oy - 5,
+        alpha: 0,
+        duration: 300,
+        ease: 'Quad.easeOut',
+        onComplete: () => g.destroy(),
+      })
+    }
   }
 
   private syncCrew(crew: CrewState[]): void {
@@ -797,15 +876,8 @@ export class ShipView {
   }
 
   private createToken(member: CrewState): CrewToken {
-    const color = CLASS_COLORS[member.cls]
     const base = this.scene.add.graphics()
-    base.fillStyle(color, 1)
-    base.fillCircle(0, 0, TOKEN_RADIUS)
-    base.lineStyle(1.5, 0x0a0e1a, 1)
-    base.strokeCircle(0, 0, TOKEN_RADIUS)
-    const initial = makeText(this.scene, 0, 0, CLASS_INITIALS[member.cls], 10, '#0a0e1a', {
-      fontStyle: 'bold',
-    }).setOrigin(0.5)
+    drawRaceBody(base, member.race, member.cls, TOKEN_RADIUS)
     const hpBar = this.scene.add.graphics()
     const taskGfx = this.scene.add.graphics()
     taskGfx.setPosition(TOKEN_RADIUS, -TOKEN_RADIUS)
@@ -814,7 +886,7 @@ export class ShipView {
     ring.strokeCircle(0, 0, TOKEN_RADIUS + 3)
     ring.setVisible(false)
 
-    const container = this.scene.add.container(0, 0, [base, initial, hpBar, taskGfx, ring])
+    const container = this.scene.add.container(0, 0, [base, hpBar, taskGfx, ring])
     container.setSize(TOKEN_RADIUS * 2 + 4, TOKEN_RADIUS * 2 + 4)
     container.setInteractive()
     container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -825,7 +897,6 @@ export class ShipView {
     const token: CrewToken = {
       container,
       base,
-      initial,
       hpBar,
       taskGfx,
       ring,
@@ -874,7 +945,17 @@ export class ShipView {
         const a = this.roomCenter(member.roomId)
         const b = this.roomCenter(nextRoom)
         const t = clamp(member.moveProgress, 0, 1)
-        target = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+        // Route through the shared doorway so crew walk along corridors instead of
+        // cutting diagonally across walls between room centres.
+        const door = this.doorByRoomPair.get(roomPairKey(member.roomId, nextRoom))
+        if (door !== undefined) {
+          target =
+            t < 0.5
+              ? { x: a.x + (door.x - a.x) * (t / 0.5), y: a.y + (door.y - a.y) * (t / 0.5) }
+              : { x: door.x + (b.x - door.x) * ((t - 0.5) / 0.5), y: door.y + (b.y - door.y) * ((t - 0.5) / 0.5) }
+        } else {
+          target = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+        }
       } else {
         const c = this.roomCenter(member.roomId)
         const mates = occupancy.get(member.roomId) ?? []
@@ -926,6 +1007,11 @@ export class ShipView {
 
 function damagedPips(sys: SystemState): number {
   return clamp(Math.ceil(sys.damage - 0.001), 0, sys.level)
+}
+
+/** Stable key for an unordered pair of room ids (door lookup). */
+function roomPairKey(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`
 }
 
 function ensureParticleTexture(scene: Phaser.Scene): void {

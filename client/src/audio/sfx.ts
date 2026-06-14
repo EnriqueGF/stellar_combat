@@ -28,6 +28,8 @@ export function buildSfx(
       return shieldHit(ctx, out, t0, df)
     case 'shield_down':
       return shieldDown(ctx, out, t0, df)
+    case 'shield_up':
+      return shieldUp(ctx, out, t0, df)
     case 'intercept':
       return intercept(ctx, out, t0, df)
     case 'miss':
@@ -54,6 +56,12 @@ export function buildSfx(
       return defeat(ctx, out, t0, df)
     case 'door':
       return door(ctx, out, t0, df)
+    case 'battle_start':
+      return battleStart(ctx, out, t0, df)
+    case 'repair':
+      return repair(ctx, out, t0, df)
+    case 'whoosh':
+      return whoosh(ctx, out, t0, df)
   }
 }
 
@@ -195,6 +203,34 @@ function shieldDown(ctx: AudioContext, out: AudioNode, t0: number, df: number): 
     decay: 0.4,
   })
   return 0.44
+}
+
+function shieldUp(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
+  // A shield layer snaps back: a soft, pleasant electronic blip that rises (the
+  // mirror image of shield_down's fall). Two gliding sine partials an octave
+  // apart with a gentle attack, plus a faint sparkle on top. Kept quiet — several
+  // can fire in quick succession as layers come up one by one after a jump.
+  pluck(ctx, out, t0, {
+    type: 'sine',
+    freq: 320 * df,
+    freqEnd: 660 * df,
+    glide: 0.13,
+    attack: 0.012,
+    peak: 0.26,
+    decay: 0.2,
+  })
+  pluck(ctx, out, t0, {
+    type: 'triangle',
+    freq: 640 * df,
+    freqEnd: 1320 * df,
+    glide: 0.13,
+    attack: 0.012,
+    peak: 0.1,
+    decay: 0.16,
+  })
+  // Faint shimmer that lands as the rise settles.
+  pluck(ctx, out, t0, { type: 'sine', freq: 1980 * df, at: 0.08, attack: 0.01, peak: 0.05, decay: 0.12 })
+  return 0.24
 }
 
 function intercept(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
@@ -380,6 +416,97 @@ function door(ctx: AudioContext, out: AudioNode, t0: number, df: number): number
     decay: 0.08,
   })
   return 0.14
+}
+
+function whoosh(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
+  // Screen-transition blip: a soft, short band-passed air sweep that rises then
+  // settles, with a faint low body. Quiet and tasteful — it fires on every
+  // navigation, so it must never grab attention.
+  noiseBurst(ctx, out, t0, {
+    filterType: 'bandpass',
+    freq: 520 * df,
+    freqEnd: 1500 * df,
+    glide: 0.14,
+    q: 0.9,
+    attack: 0.02,
+    peak: 0.12,
+    decay: 0.16,
+  })
+  pluck(ctx, out, t0, {
+    type: 'sine',
+    freq: 240 * df,
+    freqEnd: 360 * df,
+    glide: 0.12,
+    attack: 0.02,
+    peak: 0.06,
+    decay: 0.14,
+  })
+  return 0.22
+}
+
+function battleStart(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
+  // Tense "to battle" sting: an impact boom, a two-note klaxon and a rising swell.
+  pluck(ctx, out, t0, {
+    type: 'sine',
+    freq: 82 * df,
+    freqEnd: 55 * df,
+    glide: 0.3,
+    attack: 0.005,
+    peak: 0.7,
+    decay: 0.5,
+  })
+  const klaxon = [660, 554] // tense minor interval
+  for (let i = 0; i < 3; i++) {
+    const at = 0.08 + i * 0.17
+    const f = (klaxon[i % 2] ?? 660) * df
+    pluck(ctx, out, t0, { type: 'square', freq: f, at, attack: 0.005, peak: 0.2, decay: 0.13 })
+    pluck(ctx, out, t0, { type: 'sawtooth', freq: f / 2, at, attack: 0.005, peak: 0.1, decay: 0.13 })
+  }
+  // Rising tension swell into the fight.
+  const osc = ctx.createOscillator()
+  osc.type = 'sawtooth'
+  osc.frequency.setValueAtTime(150 * df, t0 + 0.5)
+  osc.frequency.exponentialRampToValueAtTime(720 * df, t0 + 0.9)
+  const lp = ctx.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 1900 * df
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0, t0 + 0.5)
+  g.gain.linearRampToValueAtTime(0.2, t0 + 0.74)
+  g.gain.linearRampToValueAtTime(0, t0 + 0.96)
+  osc.connect(lp)
+  lp.connect(g)
+  g.connect(out)
+  osc.start(t0 + 0.5)
+  osc.stop(t0 + 0.98)
+  return 0.98
+}
+
+function repair(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {
+  // "Tock tock tock" — three short woody hammer taps on a system.
+  for (let i = 0; i < 3; i++) {
+    const at = i * 0.13
+    pluck(ctx, out, t0, {
+      type: 'triangle',
+      freq: 560 * df,
+      freqEnd: 360 * df,
+      glide: 0.02,
+      at,
+      attack: 0.001,
+      peak: 0.2,
+      decay: 0.05,
+    })
+    pluck(ctx, out, t0, { type: 'sine', freq: 230 * df, at, attack: 0.001, peak: 0.13, decay: 0.045 })
+    noiseBurst(ctx, out, t0, {
+      filterType: 'highpass',
+      freq: 3200,
+      at,
+      attack: 0.0005,
+      peak: 0.05,
+      decay: 0.014,
+    })
+  }
+  return 0.46
 }
 
 function defeat(ctx: AudioContext, out: AudioNode, t0: number, df: number): number {

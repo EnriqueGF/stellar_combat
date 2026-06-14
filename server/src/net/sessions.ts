@@ -20,6 +20,8 @@ export interface Player {
   token: string
   /** Player-visible captain name (Spanish). */
   name: string
+  /** Linked account id when signed in; null for guests. */
+  accountId: string | null
   socket: GameSocket | null
   lastSeenMs: number
   duelQueue: DuelQueueEntry | null
@@ -49,6 +51,7 @@ export class SessionRegistry {
     const player: Player = {
       token: freshToken,
       name: `Capitán ${freshToken.slice(0, 4).toUpperCase()}`,
+      accountId: null,
       socket: null,
       lastSeenMs: Date.now(),
       duelQueue: null,

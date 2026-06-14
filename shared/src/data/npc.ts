@@ -1,5 +1,6 @@
 import type {
   CrewClassId,
+  CrewRaceId,
   DefenseModuleId,
   DroneId,
   ShipClassId,
@@ -21,6 +22,8 @@ export interface NpcTemplate {
   drones: DroneId[]
   defenseModule: DefenseModuleId
   crew: CrewClassId[]
+  /** Optional species per crew slot (parallel to `crew`); absent = varied default. */
+  crewRaces?: CrewRaceId[]
 }
 
 /** Index 0 = column 1 ... index 7 = column 8 (boss). */
@@ -46,6 +49,7 @@ export const NPC_TEMPLATES: NpcTemplate[] = [
     drones: [],
     defenseModule: 'mod_shields_std',
     crew: ['pilot', 'gunner'],
+    crewRaces: ['mantid', 'mantid'],
   },
   {
     shipClass: 'sentinel',
@@ -57,6 +61,7 @@ export const NPC_TEMPLATES: NpcTemplate[] = [
     drones: [],
     defenseModule: 'mod_shields_std',
     crew: ['pilot', 'gunner', 'engineer'],
+    crewRaces: ['human', 'human', 'synthetic'],
   },
   {
     shipClass: 'vanguard',
@@ -68,6 +73,7 @@ export const NPC_TEMPLATES: NpcTemplate[] = [
     drones: [],
     defenseModule: 'mod_dispersion_field',
     crew: ['pilot', 'gunner', 'soldier'],
+    crewRaces: ['mantid', 'mantid', 'rockfolk'],
   },
   {
     shipClass: 'bastion',
@@ -112,6 +118,7 @@ export const NPC_TEMPLATES: NpcTemplate[] = [
     drones: ['drone_defense'],
     defenseModule: 'mod_shields_std',
     crew: ['pilot', 'gunner', 'engineer', 'soldier'],
+    crewRaces: ['human', 'synthetic', 'synthetic', 'rockfolk'],
   },
 ]
 

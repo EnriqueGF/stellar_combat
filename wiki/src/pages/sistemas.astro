@@ -1,0 +1,75 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Sistemas y energía" current="sistemas/" lede="El reactor produce energía; tú decides qué sistemas la reciben. Esa decisión, repetida cada segundo, es el juego.">
+  <h2>El reactor</h2>
+  <p>
+    Cada nave tiene un <strong>reactor</strong> que produce un número de barras de energía (7–9 al
+    empezar, hasta <strong>25</strong> con mejoras). Esa energía es <strong>libre</strong> hasta que la
+    asignas a un sistema. En la barra inferior, el reactor muestra cuántas barras te quedan sin repartir.
+  </p>
+  <ul>
+    <li><strong>Clic izquierdo</strong> sobre un sistema → le da <strong>+1</strong> de energía.</li>
+    <li><strong>Clic derecho</strong> o <strong>rueda abajo</strong> → le quita <strong>−1</strong>.</li>
+  </ul>
+  <p>
+    Un sistema solo funciona si está alimentado, y cada sistema tiene un <strong>nivel máximo</strong>
+    que limita cuánta energía puede aceptar. Como casi nunca tendrás energía para todo, priorizar es
+    constante: subir escudos cuando llueven misiles, volcarlo todo en armas para rematar, dar a motores
+    para esquivar o cargar el salto…
+  </p>
+
+  <h2>Los siete sistemas</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Sistema</th><th class="num">Niveles</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr><td>Armas</td><td class="num">1–8</td><td>Cada arma equipada consume su energía para cargar. Sin energía suficiente, un arma no dispara.</td></tr>
+        <tr><td>Escudos</td><td class="num">1–8</td><td>1 capa de escudo por cada <strong>2</strong> niveles alimentados (máx. 4 capas).</td></tr>
+        <tr><td>Motores</td><td class="num">1–8</td><td><strong>+5% de evasión</strong> por nivel alimentado y son necesarios para cargar el salto.</td></tr>
+        <tr><td>Oxígeno</td><td class="num">1–3</td><td>Rellena el O₂ de toda la nave (+1,2%/s por nivel). Sin energía, el oxígeno cae.</td></tr>
+        <tr><td>Bahía médica</td><td class="num">1–3</td><td>Cura <strong>6 / 12 / 18 HP/s</strong> a los tripulantes que estén dentro de la sala.</td></tr>
+        <tr><td>Cabina de mando</td><td class="num">1–3</td><td>Tripulada, otorga la evasión de los motores y acelera la carga del salto (×1 / ×1,5 / ×2).</td></tr>
+        <tr><td>Bahía de drones</td><td class="num">1–3</td><td>Permite <strong>1 dron activo por nivel alimentado</strong> (máx. 2 simultáneos en el MVP).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="ctitle">Cabina vacía = sin evasión</span>
+    <p>La evasión de los motores solo cuenta si hay un tripulante en la cabina. Si la cabina queda vacía,
+      tu evasión cae a <strong>0</strong> y el HUD te avisa con un icono y texto. Mantén siempre a alguien
+      al timón (idealmente un <a href={`${base}tripulacion/`}>Piloto</a>).</p>
+  </div>
+
+  <h2>Daño y reparación de sistemas</h2>
+  <p>
+    Los sistemas se dañan cuando una sala recibe impactos (sobre todo de armas <a href={`${base}armas/`} class="c-explosive">explosivas</a>,
+    que «revientan sistemas»). Cada <strong>punto de daño</strong> reduce en 1 el nivel utilizable: un
+    sistema de nivel 4 con 2 de daño rinde como nivel 2, y a 0 queda <strong>inactivo</strong>. El daño
+    interno se acumula con decimales; la interfaz lo redondea.
+  </p>
+  <p>
+    Para repararlo, manda a un <strong>tripulante</strong> a la sala: repara <strong>1 punto cada 6 s</strong>
+    (más rápido con la clase <a href={`${base}tripulacion/`}>Ingeniero</a> o con un
+    <a href={`${base}drones/`}>dron de reparación</a>). Ojo: mientras una sala tenga <strong>brecha</strong>,
+    su sistema no puede repararse hasta sellarla.
+  </p>
+
+  <h2>Las lecturas de la nave</h2>
+  <p>
+    En la columna izquierda de la batalla tienes de un vistazo lo vital de tu nave: <strong>casco</strong>,
+    <strong>evasión</strong> (con sus alertas), <strong>capas de escudo</strong>, <strong>oxígeno</strong> y
+    tus reservas de <strong>munición</strong>. Encima de la nave enemiga ves su propia lectura para saber
+    a qué te enfrentas. Aprende a leer la evasión: si su cabina está vacía, sus disparos no fallarán y los
+    tuyos tampoco contra él.
+  </p>
+
+  <div class="callout gold">
+    <span class="ctitle">Truco de prioridad</span>
+    <p>Quitar energía a un sistema no «apaga» el progreso de golpe: un arma que pierde energía
+      <strong>conserva el 50% de su carga</strong>. Puedes mover energía de un arma casi cargada a los
+      escudos un momento y devolverla sin perderlo todo.</p>
+  </div>
+</Layout>

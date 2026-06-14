@@ -1,9 +1,9 @@
 // ShipSetup factories: from a player loadout (duel / fresh expedition) and from an
 // NPC template. Pure data construction; BattleSim consumes the result.
 
-import { CREW_CLASSES, CREW_NAMES, SHIPS, STARTING_AMMO, nextId } from '@stellar/shared'
-import type { CrewClassId, Loadout, NpcTemplate } from '@stellar/shared'
-import type { CrewSetup, ShipSetup } from './api'
+import { CREW_NAMES, SHIPS, STARTING_AMMO, crewHpMax, defaultRaceForIndex, nextId } from '@stellar/shared'
+import type { CrewClassId, CrewRaceId, Loadout, NpcTemplate } from '@stellar/shared'
+import type { BattleMod, CrewSetup, ShipSetup } from './api'
 
 function hashString(s: string): number {
   let h = 2166136261
@@ -14,15 +14,19 @@ function hashString(s: string): number {
   return h >>> 0
 }
 
-function makeCrew(classes: CrewClassId[], nameSeed: string): CrewSetup[] {
+function makeCrew(classes: CrewClassId[], nameSeed: string, races?: CrewRaceId[]): CrewSetup[] {
   const offset = hashString(nameSeed) % CREW_NAMES.length
+  // No explicit species -> a varied default rotated by the name seed so different
+  // ships look different.
+  const raceOffset = hashString(nameSeed) % 6
   return classes.map((cls, i) => {
-    const def = CREW_CLASSES[cls]
-    const hpMax = def.hpMax[0]
+    const race = races?.[i] ?? defaultRaceForIndex(i, raceOffset)
+    const hpMax = crewHpMax(cls, race, 1)
     return {
       id: nextId('crew'),
-      name: CREW_NAMES[(offset + i) % CREW_NAMES.length] ?? def.name,
+      name: CREW_NAMES[(offset + i) % CREW_NAMES.length] ?? cls,
       cls,
+      race,
       level: 1 as const,
       xp: 0,
       hp: hpMax,
@@ -43,24 +47,28 @@ export function setupFromLoadout(loadout: Loadout, name: string): ShipSetup {
     weapons: [...loadout.weapons],
     drones: [...loadout.drones],
     defenseModule: loadout.defenseModule,
-    crew: makeCrew(loadout.crew, `${name}:${loadout.ship}`),
+    crew: makeCrew(loadout.crew, `${name}:${loadout.ship}`, loadout.crewRaces),
     ammo: STARTING_AMMO,
   }
 }
 
-export function setupFromNpc(template: NpcTemplate): ShipSetup {
+export function setupFromNpc(template: NpcTemplate, mod?: BattleMod): ShipSetup {
+  // A landed sneak attack starts the enemy damaged (hull below max) and/or on fire.
+  const hullMult = mod?.enemyHullMult ?? 1
+  const hull = Math.max(1, Math.round(template.hull * hullMult))
   return {
     shipClass: template.shipClass,
     name: template.name,
-    hull: template.hull,
+    hull,
     hullMax: template.hull,
     reactor: template.reactor,
     systems: { ...template.systems },
     weapons: [...template.weapons],
     drones: [...template.drones],
     defenseModule: template.defenseModule,
-    crew: makeCrew(template.crew, template.name),
+    crew: makeCrew(template.crew, template.name, template.crewRaces),
     ammo: STARTING_AMMO,
     boss: template.shipClass === 'hegemon',
+    startFire: mod?.enemyStartFire === true,
   }
 }

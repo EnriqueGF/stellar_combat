@@ -1,27 +1,25 @@
-// Crew portrait cards (GAME_SPEC §6.3, HUD.portraitsRect): 4 vertical cards
-// with name, class (icon + text), level stars, HP bar with number, selection
-// border and a danger blink below 30% HP.
+// Crew portrait cards (GAME_SPEC §6.3, HUD.portraitsRect): compact FTL-style rows
+// — a small species/class icon, the name and a health bar. Everything else
+// (class, level, exact HP, species traits) lives in the hover tooltip.
 
 import type Phaser from 'phaser'
-import { CREW_CLASSES, clamp, type CrewState } from '@stellar/shared'
-import { COLORS, COLORS_CSS, HUD } from '../theme'
-import { CLASS_COLORS, cssOf, makeText, type Rect } from './common'
+import { CREW_CLASSES, CREW_RACES, clamp, type CrewState } from '@stellar/shared'
+import { COLORS, HUD } from '../theme'
+import { makeText, type Rect } from './common'
+import { drawRaceBody } from './crewArt'
 import { drawCrossOut } from './icons'
 import { Tooltip } from './uiKit'
 
-const CARD_H = 93
-const CARD_STEP = 97
+const CARD_H = 38
+const CARD_STEP = 44
 const DEPTH = 12
 
 interface Card {
   crewId: string | null
   bg: Phaser.GameObjects.Graphics
   nameText: Phaser.GameObjects.Text
-  classText: Phaser.GameObjects.Text
-  starsText: Phaser.GameObjects.Text
-  hpText: Phaser.GameObjects.Text
   hpBar: Phaser.GameObjects.Graphics
-  classDot: Phaser.GameObjects.Graphics
+  raceGfx: Phaser.GameObjects.Graphics
   selectGfx: Phaser.GameObjects.Graphics
   blinkGfx: Phaser.GameObjects.Graphics
   deadGfx: Phaser.GameObjects.Graphics
@@ -39,35 +37,26 @@ export class CrewPortraits {
   private readonly scene: Phaser.Scene
   private readonly cards: Card[] = []
   private crew: CrewState[] = []
-  private selectedId: string | null = null
+  private selectedIds = new Set<string>()
 
   constructor(scene: Phaser.Scene, initial: CrewState[], cb: PortraitCallbacks) {
     this.scene = scene
     for (let i = 0; i < 4; i++) {
       const r = this.cardRect(i)
       const bg = scene.add.graphics().setDepth(DEPTH)
-      const nameText = makeText(scene, r.x + 6, r.y + 5, '', 11).setDepth(DEPTH + 1)
-      const classDot = scene.add.graphics().setDepth(DEPTH + 1)
-      const classText = makeText(scene, r.x + 18, r.y + 22, '', 10, COLORS_CSS.textDim).setDepth(
-        DEPTH + 1,
-      )
-      const starsText = makeText(scene, r.x + 6, r.y + 38, '', 11, COLORS_CSS.energy).setDepth(
-        DEPTH + 1,
-      )
-      const hpText = makeText(scene, r.x + r.w - 6, r.y + 54, '', 10).setOrigin(1, 0).setDepth(
-        DEPTH + 1,
-      )
+      const raceGfx = scene.add.graphics().setDepth(DEPTH + 1)
+      const nameText = makeText(scene, r.x + 25, r.y + 5, '', 11).setDepth(DEPTH + 1)
       const hpBar = scene.add.graphics().setDepth(DEPTH + 1)
       const selectGfx = scene.add.graphics().setDepth(DEPTH + 2).setVisible(false)
       selectGfx.lineStyle(2, COLORS.ok, 1)
-      selectGfx.strokeRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 6)
+      selectGfx.strokeRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 5)
       const blinkGfx = scene.add.graphics().setDepth(DEPTH + 2).setVisible(false)
       blinkGfx.lineStyle(2, COLORS.danger, 1)
-      blinkGfx.strokeRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 6)
+      blinkGfx.strokeRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 5)
       const deadGfx = scene.add.graphics().setDepth(DEPTH + 2).setVisible(false)
       deadGfx.fillStyle(0x05080f, 0.6)
-      deadGfx.fillRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 6)
-      drawCrossOut(deadGfx, r.x + r.w / 2, r.y + r.h / 2, 26, COLORS.danger)
+      deadGfx.fillRoundedRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 5)
+      drawCrossOut(deadGfx, r.x + 13, r.y + r.h / 2, 18, COLORS.danger)
 
       const zone = scene.add
         .zone(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
@@ -92,18 +81,16 @@ export class CrewPortraits {
         if (member === undefined) return 'Sin tripulante'
         if (member.hp <= 0) return `${member.name} — muerto en combate`
         const cls = CREW_CLASSES[member.cls]
-        return `${member.name} — ${cls.name} (nivel ${member.level})\n${cls.desc}\nHP: ${Math.round(member.hp)}/${member.hpMax}\nClick: seleccionar · luego click en una sala para moverlo`
+        const race = CREW_RACES[member.race]
+        return `${member.name} — ${race?.name ?? ''} · ${cls.name} (nivel ${member.level})\n${cls.desc}\n${race ? `${race.name}: ${race.desc}\n` : ''}HP: ${Math.round(member.hp)}/${member.hpMax}\nClic izq.: seleccionar · arrastra para varios · clic dcho. en una sala los mueve`
       })
 
       this.cards.push({
         crewId: null,
         bg,
         nameText,
-        classText,
-        starsText,
-        hpText,
         hpBar,
-        classDot,
+        raceGfx,
         selectGfx,
         blinkGfx,
         deadGfx,
@@ -145,13 +132,10 @@ export class CrewPortraits {
           card.crewId = null
           card.bg.clear()
           card.bg.fillStyle(COLORS.panel, 0.5)
-          card.bg.fillRoundedRect(r.x, r.y, r.w, r.h, 6)
+          card.bg.fillRoundedRect(r.x, r.y, r.w, r.h, 5)
           card.nameText.setText('')
-          card.classText.setText('')
-          card.starsText.setText('')
-          card.hpText.setText('')
           card.hpBar.clear()
-          card.classDot.clear()
+          card.raceGfx.clear()
           card.deadGfx.setVisible(false)
           card.blinkGfx.setVisible(false)
         }
@@ -168,41 +152,43 @@ export class CrewPortraits {
 
       card.bg.clear()
       card.bg.fillStyle(COLORS.panel, 0.95)
-      card.bg.fillRoundedRect(r.x, r.y, r.w, r.h, 6)
+      card.bg.fillRoundedRect(r.x, r.y, r.w, r.h, 5)
       card.bg.lineStyle(1, 0x35506e, 1)
-      card.bg.strokeRoundedRect(r.x, r.y, r.w, r.h, 6)
+      card.bg.strokeRoundedRect(r.x, r.y, r.w, r.h, 5)
 
-      card.nameText.setText(member.name.toUpperCase().slice(0, 9))
-      const cls = CREW_CLASSES[member.cls]
-      card.classText.setText(cls.name)
-      card.classDot.clear()
-      card.classDot.fillStyle(CLASS_COLORS[member.cls], 1)
-      card.classDot.fillCircle(r.x + 10, r.y + 28, 5)
-      card.classDot.lineStyle(1, 0x0a0e1a, 1)
-      card.classDot.strokeCircle(r.x + 10, r.y + 28, 5)
-      card.starsText.setText('★'.repeat(member.level))
+      card.nameText.setText(member.name.toUpperCase().slice(0, 8))
+
+      // Species/class silhouette as the card's icon.
+      card.raceGfx.clear()
+      card.raceGfx.setPosition(r.x + 13, r.y + r.h / 2)
+      if (!dead) drawRaceBody(card.raceGfx, member.race, member.cls, 12)
 
       const pct = clamp(member.hp / Math.max(1, member.hpMax), 0, 1)
-      card.hpText.setText(`${Math.max(0, Math.round(member.hp))}`)
-      card.hpText.setColor(cssOf(pct > 0.6 ? COLORS.ok : pct > 0.3 ? COLORS.warn : COLORS.danger))
+      const hpColor = pct > 0.6 ? COLORS.ok : pct > 0.3 ? COLORS.warn : COLORS.danger
+      const bw = r.w - 31
+      const bx = r.x + 25
+      const by = r.y + 24
       card.hpBar.clear()
       card.hpBar.fillStyle(0x05080f, 1)
-      card.hpBar.fillRect(r.x + 6, r.y + r.h - 18, r.w - 12, 7)
-      card.hpBar.fillStyle(pct > 0.6 ? COLORS.ok : pct > 0.3 ? COLORS.warn : COLORS.danger, 1)
-      card.hpBar.fillRect(r.x + 6, r.y + r.h - 18, (r.w - 12) * pct, 7)
+      card.hpBar.fillRect(bx, by, bw, 6)
+      card.hpBar.fillStyle(hpColor, 1)
+      card.hpBar.fillRect(bx, by, bw * pct, 6)
       card.hpBar.lineStyle(1, 0x35506e, 1)
-      card.hpBar.strokeRect(r.x + 6, r.y + r.h - 18, r.w - 12, 7)
+      card.hpBar.strokeRect(bx, by, bw, 6)
 
       card.deadGfx.setVisible(dead)
       card.blinking = !dead && pct < 0.3
-      if (dead && this.selectedId === member.id) this.setSelected(null)
+      if (dead && this.selectedIds.has(member.id)) {
+        this.selectedIds.delete(member.id)
+        card.selectGfx.setVisible(false)
+      }
     }
   }
 
-  setSelected(crewId: string | null): void {
-    this.selectedId = crewId
+  setSelected(sel: string | string[] | null): void {
+    this.selectedIds = sel === null ? new Set() : new Set(Array.isArray(sel) ? sel : [sel])
     for (const card of this.cards) {
-      card.selectGfx.setVisible(card.crewId !== null && card.crewId === crewId)
+      card.selectGfx.setVisible(card.crewId !== null && this.selectedIds.has(card.crewId))
     }
   }
 
@@ -213,7 +199,7 @@ export class CrewPortraits {
     const r = this.cardRect(idx)
     const g = this.scene.add.graphics().setDepth(DEPTH + 4)
     g.fillStyle(color, 0.5)
-    g.fillRoundedRect(r.x, r.y, r.w, r.h, 6)
+    g.fillRoundedRect(r.x, r.y, r.w, r.h, 5)
     this.scene.tweens.add({
       targets: g,
       alpha: 0,
@@ -233,11 +219,8 @@ export class CrewPortraits {
     for (const card of this.cards) {
       card.bg.destroy()
       card.nameText.destroy()
-      card.classText.destroy()
-      card.starsText.destroy()
-      card.hpText.destroy()
       card.hpBar.destroy()
-      card.classDot.destroy()
+      card.raceGfx.destroy()
       card.selectGfx.destroy()
       card.blinkGfx.destroy()
       card.deadGfx.destroy()

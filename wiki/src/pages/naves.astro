@@ -1,0 +1,88 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Naves" current="naves/" lede="Tres naves jugables con personalidades muy distintas, más el acorazado que cierra el sector.">
+  <p>
+    Eliges nave en la pantalla de equipamiento. No hay una «mejor»: cada una empieza con un reparto de
+    niveles, un número de soportes de arma y un rasgo propio que cambia por completo cómo juegas. En
+    Expedición la nave evoluciona con la run; en Duelo entra tal cual.
+  </p>
+
+  <Figure src="screenshots/loadout.png" alt="Pantalla de equipamiento eligiendo nave" caption="La pantalla de equipamiento: elige nave, arma por arma (8 puntos), módulo, drones y tripulación." />
+
+  <h2>Comparativa rápida</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nave</th><th>Perfil</th><th class="num">Casco</th><th class="num">Reactor</th><th class="num">Slots de arma</th><th>Niveles iniciales</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Centinela</td><td><span class="tag-pill ok">Fácil</span> Equilibrada</td>
+          <td class="num">30</td><td class="num">8</td><td class="num">3</td>
+          <td>Armas 3 · Escudos 2 · Motores 2 · resto 1</td>
+        </tr>
+        <tr>
+          <td>Vanguardia</td><td><span class="tag-pill danger">Difícil</span> Agresiva</td>
+          <td class="num">30</td><td class="num">7</td><td class="num">4</td>
+          <td>Armas 4 · Escudos 2 · Motores 2 · resto 1</td>
+        </tr>
+        <tr>
+          <td>Bastión</td><td><span class="tag-pill warn">Media</span> Defensiva</td>
+          <td class="num">33</td><td class="num">9</td><td class="num">2</td>
+          <td>Escudos 4 · Armas 2 · Motores 1 · resto 1</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Reactor = energía disponible para repartir entre sistemas (máximo 25 con mejoras).
+    Más slots de arma = más fuego simultáneo, pero también más energía que repartir.</p>
+
+  <h2>Centinela <span class="tag-pill ok">Fácil</span></h2>
+  <div class="panel">
+    <p><em>«Crucero equilibrado de la Flota Libre. Sin puntos débiles, sin extremos: ideal para aprender.»</em></p>
+    <p><strong>Rasgo:</strong> sin extremos; sus mejoras cuestan lo estándar. Empieza con escudos de
+      nivel 2 y tres armas, así que aguanta y pega de forma pareja. Es la nave del tutorial y la
+      recomendada para tus primeras runs.</p>
+    <p class="c-dim">Casco 30 · Reactor 8 · 3 slots de arma.</p>
+  </div>
+
+  <h2>Vanguardia <span class="tag-pill danger">Difícil</span></h2>
+  <div class="panel">
+    <p><em>«Interceptor de asalto: 4 soportes de arma y mejoras de armamento baratas, pero escudos frágiles al despegar.»</em></p>
+    <p><strong>Rasgo:</strong> <strong>mejoras de armas un 25% más baratas</strong> en chatarra y
+      <strong>4 slots de arma</strong> (uno más que nadie). A cambio, su reactor es el más pequeño (7) y
+      sus escudos arrancan flojos: es una nave de alto potencial que castiga los errores. Para jugadores
+      que quieren abrumar con fuego antes de que el rival reaccione.</p>
+    <p class="c-dim">Casco 30 · Reactor 7 · 4 slots de arma · descuento de armas −25%.</p>
+  </div>
+
+  <h2>Bastión <span class="tag-pill warn">Media</span></h2>
+  <div class="panel">
+    <p><em>«Fortaleza orbital móvil: escudos de nivel 4 y casco reforzado (+3), pero solo 2 armas. El reactor mejora barato.»</em></p>
+    <p><strong>Rasgo:</strong> <strong>casco +3</strong> (33), <strong>escudos de nivel 4</strong> de salida
+      y <strong>mejoras de reactor un 25% más baratas</strong>. Solo monta 2 armas y sus motores son
+      lentos (nivel 1), así que escala tarde: aguanta de sobra al principio y se vuelve imparable cuando
+      su gran reactor alimenta escudos máximos y armas pesadas a la vez.</p>
+    <p class="c-dim">Casco 33 · Reactor 9 · 2 slots de arma · descuento de reactor −25%.</p>
+  </div>
+
+  <h2>El jefe: Acorazado Hegemón <span class="tag-pill danger">No jugable</span></h2>
+  <div class="panel">
+    <p><em>«El puño del sector: un acorazado de asalto con armamento por capas. Al 50% de casco entra en frenesí.»</em></p>
+    <p>Cierra la columna 8 de toda Expedición. Casco <strong>45</strong>, reactor <strong>16</strong>,
+      escudos de 3 capas y cuatro armas pesadas. Tiene <strong>dos fases</strong>: al bajar del
+      <strong>50% de casco</strong> recibe un subidón de energía (+4) que alimenta de golpe más armas y
+      motores. No se puede eludir ni sobornar: es a vida o muerte.</p>
+    <p class="c-dim">Aparece también como plantilla visual de algunos NPCs avanzados.</p>
+  </div>
+
+  <div class="callout">
+    <span class="ctitle">Salas y planos</span>
+    <p>Cada nave tiene su propia rejilla de salas conectadas por puertas, con los sistemas repartidos de
+      forma distinta. Eso importa: en combate decides a qué sala enemiga disparar y por dónde mover a tu
+      tripulación. Verás el plano de tu nave en el corte transversal de la batalla.</p>
+  </div>
+</Layout>

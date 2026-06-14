@@ -1,0 +1,77 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Modos de juego" current="modos/" lede="Tres formas de jugar: la campaña roguelite, el duelo en tiempo real y el tutorial de práctica.">
+  <p>Desde el menú principal eliges entre tres modos. Todos comparten el mismo motor de combate;
+    cambian el contexto, la progresión y las reglas alrededor.</p>
+
+  <h2>Expedición</h2>
+  <div class="stat-chips">
+    <span class="chip"><b>Tipo:</b> roguelite por turnos de nodos</span>
+    <span class="chip"><b>Rival:</b> IA (NPCs)</span>
+    <span class="chip"><b>Pausa:</b> sí</span>
+    <span class="chip"><b>Progresión:</b> chatarra y mejoras</span>
+  </div>
+  <p>
+    Una <em>run</em>: recorres un <strong>sector de 8 columnas</strong> de nodos eligiendo tu ruta.
+    Cada nodo es un combate, una élite, un evento narrativo o una tienda. Vences NPCs cada vez más
+    duros, ganas <strong>chatarra</strong>, mejoras tu nave entre nodos y al final te espera el
+    <strong>jefe</strong>. Tienes pausa táctica y, antes de cada combate (salvo el primero), un
+    <strong>encuentro narrativo</strong> con opciones: pelear, atacar por sorpresa, eludir o pagar.
+  </p>
+  <p>
+    Si pierdes el casco o muere toda tu tripulación, la run termina. Es el modo principal del juego:
+    tiene su propia página, <a href={`${base}expedicion/`}>La expedición</a>.
+  </p>
+
+  <hr />
+
+  <h2>Duelo PvP</h2>
+  <div class="stat-chips">
+    <span class="chip"><b>Tipo:</b> 1v1 en tiempo real</span>
+    <span class="chip"><b>Rival:</b> otro jugador (o IA)</span>
+    <span class="chip"><b>Pausa:</b> no</span>
+    <span class="chip"><b>Progresión:</b> ninguna (partida única)</span>
+  </div>
+  <p>
+    Te pones en cola de emparejamiento y, al encontrar rival, ambos montáis vuestro loadout con un
+    <strong>presupuesto fijo de 8 puntos</strong> de armas. No hay progresión: cada nave entra tal cual.
+    Sin pausa y con misiles limitados, el duelo premia la lectura rápida y la gestión de energía.
+  </p>
+  <ul>
+    <li><strong>Elegir loadout (60 s):</strong> nave + armas (8 pts) + módulo de defensa + drones + clases
+      de tripulación. Cada nave trae dos <strong>presets</strong> («Equilibrado» y «Agresivo»); el
+      Equilibrado viene precargado. Si se acaba el tiempo, se confirma el loadout actual (siempre válido).</li>
+    <li><strong>Sin rival a la vista (15 s):</strong> si nadie entra en cola, se te ofrece combatir
+      contra un <strong>NPC equivalente</strong> con el mismo flujo.</li>
+    <li><strong>Muerte súbita (5 min):</strong> para evitar tablas, a los 5 minutos se desactiva la
+      regeneración de escudos de ambos. Hay un aviso con alarma a los 4:30.</li>
+    <li><strong>Desconexión:</strong> 30 s de gracia para reconectar antes de perder por abandono.</li>
+  </ul>
+
+  <hr />
+
+  <h2>Tutorial</h2>
+  <div class="stat-chips">
+    <span class="chip"><b>Tipo:</b> combate de práctica</span>
+    <span class="chip"><b>Rival:</b> NPC introductorio (sin escudos)</span>
+    <span class="chip"><b>Pausa:</b> sí</span>
+    <span class="chip"><b>Guía:</b> siempre activa</span>
+  </div>
+  <p>
+    Un combate autocontenido pensado para aprender, con la nave <strong>Centinela «Equilibrado»</strong>
+    contra el enemigo más débil del juego (el de la columna 1, sin escudos). La <strong>guía de 6 pasos</strong>
+    está siempre activa y la pausa táctica permitida. No forma parte de una run: al terminar —ganes,
+    pierdas o salgas por el menú— vuelves al menú principal. Puedes repetirlo cuando quieras.
+  </p>
+  <p>Los seis pasos guiados te enseñan, en orden: <strong>energía → apuntar → triángulo de categorías →
+    escudos → tripulación → pausa</strong>.</p>
+
+  <div class="callout">
+    <span class="ctitle">Pausa táctica</span>
+    <p>Disponible en Expedición, Duelo-vs-NPC y Tutorial — es decir, siempre que tu rival sea la IA.
+      Pulsa <kbd>Espacio</kbd> para congelar la batalla y pensar. En el Duelo contra una persona, no.</p>
+  </div>
+</Layout>

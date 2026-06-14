@@ -1,0 +1,9 @@
+---
+// Weapon-category badge: colour + the bonus triangle glyph (shape, not just colour).
+interface Props {
+  c: 'energy' | 'kinetic' | 'explosive'
+}
+const { c } = Astro.props
+const label = c === 'energy' ? 'Energía' : c === 'kinetic' ? 'Cinético' : 'Explosivo'
+---
+<span class={`badge ${c}`}>{label}</span>

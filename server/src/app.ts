@@ -5,6 +5,7 @@ import { createServer, type Server as HttpServer } from 'node:http'
 import express, { type Express } from 'express'
 import { Server } from 'socket.io'
 import type { ClientToServerEvents, ServerToClientEvents } from '@stellar/shared'
+import { AccountStore } from './net/accounts'
 import { registerHandlers, type HandlerRegistry } from './net/handlers'
 import { SessionRegistry, type GameServer } from './net/sessions'
 
@@ -13,6 +14,7 @@ export interface AppBundle {
   httpServer: HttpServer
   io: GameServer
   sessions: SessionRegistry
+  accounts: AccountStore
   handlers: HandlerRegistry
   /** Stops battle loops, queue timers, the session sweeper and the socket server. */
   close: () => void
@@ -25,13 +27,15 @@ export function createApp(): AppBundle {
     cors: { origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] },
   })
   const sessions = new SessionRegistry()
-  const handlers = registerHandlers(io, sessions)
+  const accounts = new AccountStore()
+  const handlers = registerHandlers(io, sessions, accounts)
 
   const close = (): void => {
     handlers.shutdown()
     sessions.close()
+    accounts.close()
     io.close()
   }
 
-  return { app, httpServer, io, sessions, handlers, close }
+  return { app, httpServer, io, sessions, accounts, handlers, close }
 }

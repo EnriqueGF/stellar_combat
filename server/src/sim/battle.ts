@@ -30,7 +30,7 @@ import { tickEnvironment } from './environment'
 import {
   bfsPath,
   buildInternalShip,
-  cockpitManned,
+  engineRoomManned,
   findSystem,
   otherSide,
   recomputeShip,
@@ -138,30 +138,25 @@ export class BattleSim implements IBattleSim {
 
   private tickJump(side: Side): void {
     const ship = this.ctx.ships[side]
-    if (!ship.jump.charging) {
-      ship.jump.blocked = null
-      return
-    }
     const engines = findSystem(ship, 'engines')
-    if (!cockpitManned(ship)) {
-      ship.jump.blocked = 'no_pilot'
-      return
-    }
+    // The drive charges automatically from the start of combat, as long as the
+    // engines have power.
     if ((engines?.power ?? 0) < 1) {
       ship.jump.blocked = 'no_engine_power'
       return
     }
-    ship.jump.blocked = null
-    const cockpit = findSystem(ship, 'cockpit')
-    const level = clamp(cockpit ? usableLevel(cockpit) : 1, 1, COCKPIT_JUMP_MULT.length)
-    const mult = COCKPIT_JUMP_MULT[level - 1] ?? 1
-    ship.jump.progress = Math.min(1, ship.jump.progress + DT / (JUMP_CHARGE_SEC / mult))
-    if (ship.jump.progress >= 1 && this.result === null) {
-      this.ctx.events.push({ t: 'jump_charged', side })
-      this.ctx.events.push({ t: 'fled', side })
-      this.ctx.events.push({ t: 'log', msg: `${ship.name} ha saltado y huye del combate.` })
-      this.finish(otherSide(side), 'fled')
+    if (!ship.jump.ready) {
+      const cockpit = findSystem(ship, 'cockpit')
+      const level = clamp(cockpit ? usableLevel(cockpit) : 1, 1, COCKPIT_JUMP_MULT.length)
+      const mult = COCKPIT_JUMP_MULT[level - 1] ?? 1
+      ship.jump.progress = Math.min(1, ship.jump.progress + DT / (JUMP_CHARGE_SEC / mult))
+      if (ship.jump.progress >= 1) {
+        ship.jump.ready = true
+        this.ctx.events.push({ t: 'jump_charged', side })
+      }
     }
+    // Once charged, performing the jump needs a crew member in the engine room.
+    ship.jump.blocked = ship.jump.ready && !engineRoomManned(ship) ? 'no_crew' : null
   }
 
   private checkBossPhase(side: Side): void {
@@ -270,14 +265,14 @@ export class BattleSim implements IBattleSim {
     door.open = !door.open
   }
 
-  setJumpCharging(side: Side, charging: boolean): void {
+  /** Player flee command: only fires when the drive is charged and engines are manned. */
+  requestJump(side: Side): void {
     if (this.result !== null) return
     const ship = this.ctx.ships[side]
-    if (charging && !ship.jump.charging) {
-      this.ctx.events.push({ t: 'log', msg: `${ship.name} está cargando el salto de huida.` })
-    }
-    ship.jump.charging = charging
-    if (!charging) ship.jump.blocked = null
+    if (!ship.jump.ready || !engineRoomManned(ship)) return
+    this.ctx.events.push({ t: 'fled', side })
+    this.ctx.events.push({ t: 'log', msg: `${ship.name} ha saltado y huye del combate.` })
+    this.finish(otherSide(side), 'fled')
   }
 
   surrender(side: Side): void {
@@ -326,6 +321,7 @@ export class BattleSim implements IBattleSim {
         id: c.id,
         name: c.name,
         cls: c.cls,
+        race: c.race,
         level: c.level,
         xp: c.xp,
         hp: Math.max(1, Math.round(c.hp)),
@@ -338,6 +334,7 @@ export class BattleSim implements IBattleSim {
 function toPublicShipState(ship: InternalShip): ShipState {
   return structuredClone({
     shipClass: ship.shipClass,
+    name: ship.name,
     hull: ship.hull,
     hullMax: ship.hullMax,
     reactor: ship.reactor,

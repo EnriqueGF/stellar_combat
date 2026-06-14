@@ -1,0 +1,92 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Combate y daño" current="combate/" lede="El triángulo de categorías, los escudos por capas y la evasión: las tres reglas que deciden cada impacto.">
+  <h2>El triángulo de categorías</h2>
+  <p>
+    Toda arma pertenece a una de tres categorías. Cada una <strong>brilla (×1,25)</strong> contra un tipo
+    de defensa y <strong>flojea (×0,75)</strong> contra otro. Es un triángulo cerrado, fácil de recordar:
+  </p>
+
+  <div class="rule">
+    <span class="e">Energía</span> funde escudos · <span class="k">Cinético</span> perfora cascos · <span class="x">Explosivo</span> revienta sistemas
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Categoría</th><th>Brilla ×1,25 contra</th><th>Floja ×0,75 contra</th><th>Rasgo</th></tr></thead>
+      <tbody>
+        <tr><td class="c-energy">Energía</td><td>escudos</td><td>casco</td><td>cadencia alta, sin munición</td></tr>
+        <tr><td class="c-kinetic">Cinético</td><td>casco</td><td>sistemas</td><td>proyectil rápido, sin munición</td></tr>
+        <tr><td class="c-explosive">Explosivo</td><td>sistemas</td><td>escudos (si lo bloquean)</td><td>perfora escudos, gasta misiles</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Cada categoría tiene exactamente un ×1,25 y un ×0,75: ninguna domina, todas tienen su sitio.</p>
+
+  <h2>Cómo se resuelve un impacto</h2>
+  <p>Cuando un proyectil llega a su sala objetivo, el servidor resuelve en este orden:</p>
+  <ol>
+    <li><strong>¿Hay escudo?</strong> Si la nave tiene capas de escudo y el arma <em>no</em> las perfora,
+      el disparo es <strong>absorbido</strong>: resta <code>daño × mult. de escudos</code> de puntos de
+      escudo y no toca el casco. (Aquí brilla la <span class="c-energy">Energía</span>.)</li>
+    <li><strong>¿Pasa el escudo?</strong> Si no había escudo o el arma lo perfora, se tira la
+      <strong>evasión</strong>. Si la nave esquiva, el disparo falla.</li>
+    <li><strong>Impacto.</strong> Si acierta, aplica <code>daño al casco × mult. de casco</code> (brilla el
+      <span class="c-kinetic">Cinético</span>) <em>y</em> <code>daño al sistema de esa sala × mult. de
+      sistemas</code> (brilla el <span class="c-explosive">Explosivo</span>), más sus efectos:
+      probabilidad de <span class="c-warn">fuego</span> o de <span class="c-danger">brecha</span>.</li>
+  </ol>
+  <p class="c-dim">El daño se acumula en decimales (sin redondear por impacto); la interfaz redondea para mostrarlo.</p>
+
+  <h2>Escudos: el modelo por capas</h2>
+  <p>
+    Los escudos son una burbuja de hexágonos alrededor de la nave. Su número de <strong>capas</strong>
+    depende del sistema de escudos alimentado: <strong>1 capa por cada 2 niveles</strong> de energía, hasta
+    un máximo de <strong>4 capas</strong>.
+  </p>
+  <ul>
+    <li>Por dentro, cada capa vale <strong>2 puntos de escudo</strong>. Un disparo bloqueado resta
+      <code>daño × mult. de categoría</code> de esos puntos (de forma fraccional, sin redondeos por
+      impacto). Las capas visibles son el redondeo hacia arriba de esos puntos.</li>
+    <li>Mientras quede escudo, los proyectiles que no perforan son <strong>absorbidos por completo</strong>:
+      da igual lo grande que sea el golpe, una capa lo para (y se gasta).</li>
+    <li><strong>Perforación N:</strong> un arma con perforación N atraviesa el escudo si quedan N capas o
+      menos. La <strong>Bomba Ígnea</strong> «perfora todo»: se teletransporta dentro ignorando cualquier
+      escudo.</li>
+    <li><strong>Regeneración:</strong> recupera <strong>1 capa cada 6 s</strong>, pero solo tras
+      <strong>2 s sin recibir impactos en el escudo</strong>. <em>Cada</em> impacto reinicia ese contador,
+      así que una lluvia de proyectiles puede mantener los escudos sin regenerar.</li>
+  </ul>
+  <div class="callout">
+    <span class="ctitle">Por eso importa la regla</span>
+    <p>Contra un rival con muchos escudos, abrir con <span class="c-energy">Energía</span> (×1,25 a escudos)
+      para tumbarlos rápido y rematar con <span class="c-kinetic">Cinético</span> (×1,25 al casco). O
+      saltarte el problema con <span class="c-explosive">Explosivos</span> que perforan. Mezclar
+      categorías es casi siempre mejor que apilar una sola.</p>
+  </div>
+
+  <h2>Evasión: esquivar el golpe</h2>
+  <p>La probabilidad de esquivar un disparo (que ya haya pasado el escudo) se calcula así:</p>
+  <div class="panel">
+    <p style="margin:0"><strong>Evasión</strong> = (motores alimentados × <strong>5%</strong>) +
+      bonus del <strong>piloto</strong> en la cabina + bonus del <strong>módulo de defensa</strong>,
+      con un tope del <strong>45%</strong>.</p>
+  </div>
+  <ul>
+    <li>La parte de los motores <strong>solo cuenta si la cabina está tripulada</strong>. Sin nadie al
+      timón, la evasión es <strong>0</strong> (con alerta en el HUD).</li>
+    <li>El <a href={`${base}tripulacion/`}>Piloto</a> añade +5/+8/+12% según su nivel; el
+      <a href={`${base}modulos/`}>Campo de Dispersión</a> suma +10% (y la Armadura Reactiva resta 5%).</li>
+    <li>La precisión base es total: un disparo acierta salvo que el objetivo lo esquive. Algunas armas
+      modifican su propia precisión (la <span class="c-kinetic">Metralla</span> pierde un 10% por
+      fragmento), y los <strong>haces</strong> no fallan nunca (pero tampoco perforan escudos).</li>
+  </ul>
+
+  <div class="callout gold">
+    <span class="ctitle">Anula su evasión</span>
+    <p>¿El enemigo esquiva demasiado? Dispara a su <strong>cabina</strong> o a sus <strong>motores</strong>:
+      sin piloto o sin motores, su evasión se desploma y tus siguientes andanadas harán blanco seguro.</p>
+  </div>
+</Layout>

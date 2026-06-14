@@ -15,10 +15,12 @@ import {
   type ErrorMsg,
   type Loadout,
   type Side,
+  type SystemId,
 } from '@stellar/shared'
 import type { IBattleSim } from '../sim/api'
 import { setupFromLoadout, setupFromNpc } from '../sim/setup'
 import { RunManager, type NodeEntry } from '../run/runManager'
+import type { AccountStore } from './accounts'
 import { BattleHost } from './battleHost'
 import type { GameServer, GameSocket, Player, SessionRegistry } from './sessions'
 
@@ -29,11 +31,39 @@ export interface HandlerRegistry {
   shutdown(): void
 }
 
-export function registerHandlers(io: GameServer, sessions: SessionRegistry): HandlerRegistry {
+export function registerHandlers(
+  io: GameServer,
+  sessions: SessionRegistry,
+  accounts: AccountStore,
+): HandlerRegistry {
   const duelQueue: Player[] = []
   const liveHosts = new Set<BattleHost>()
 
   const randomSeed = (): number => Math.floor(Math.random() * 0x7fffffff)
+
+  /** Records the end of a run against the player's account (no-op for guests). */
+  const recordRunOver = (p: Player, run: RunManager, victory: boolean): void => {
+    accounts.updateStats(p.accountId, (s) => {
+      s.bestColumn = Math.max(s.bestColumn, run.column)
+      s.scrapEarned += run.scrapEarnedThisRun
+      if (victory) s.runsWon += 1
+    })
+  }
+
+  /** Records a finished duel for one seat (win/loss). */
+  const recordDuel = (p: Player | null, won: boolean, crewLost: number): void => {
+    if (!p) return
+    accounts.updateStats(p.accountId, (s) => {
+      if (won) {
+        s.duelsWon += 1
+        s.battlesWon += 1
+      } else {
+        s.duelsLost += 1
+        s.battlesLost += 1
+      }
+      s.crewLost += crewLost
+    })
+  }
 
   const broadcastLobby = (): void => {
     io.to(LOBBY_ROOM).emit('lobby:state', {
@@ -82,8 +112,12 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       setupFromLoadout(lb, pb.name),
       { a: pa, b: pb },
       {
-        ...hostConfigBase((): void => {
+        ...hostConfigBase((result): void => {
           if (host) liveHosts.delete(host)
+          if (result.winner !== null) {
+            recordDuel(pa, result.winner === 'a', result.stats.a.crewLost)
+            recordDuel(pb, result.winner === 'b', result.stats.b.crewLost)
+          }
           broadcastLobby()
         }),
         mode: 'duel',
@@ -106,8 +140,9 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       setupFromNpc(template),
       { a: p, b: null },
       {
-        ...hostConfigBase((): void => {
+        ...hostConfigBase((result): void => {
           if (host) liveHosts.delete(host)
+          if (result.winner !== null) recordDuel(p, result.winner === 'a', result.stats.a.crewLost)
           broadcastLobby()
         }),
         mode: 'duel',
@@ -152,13 +187,24 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
     run.inBattle = false
     const won = result.winner === side
     const fled = result.reason === 'fled' && result.winner !== side
+    // Crew lost this battle counts toward the lifetime profile regardless of outcome.
+    accounts.updateStats(p.accountId, (s) => {
+      s.crewLost += result.stats[side].crewLost
+    })
     if (won || fled) {
       const me = sim.shipState(side)
-      run.absorbBattleState(me.hull, me.ammo, sim.crewExport(side))
+      const power: Partial<Record<SystemId, number>> = {}
+      for (const s of me.systems) power[s.id] = s.power
+      run.absorbBattleState(me.hull, me.ammo, sim.crewExport(side), power)
     }
     if (won) {
+      accounts.updateStats(p.accountId, (s) => {
+        s.battlesWon += 1
+        s.bestColumn = Math.max(s.bestColumn, run.column)
+      })
       if (opts.boss) {
         run.markVictory()
+        recordRunOver(p, run, true)
         p.socket?.emit('run:state', run.publicState())
         p.socket?.emit('run:over', true, { column: run.column, scrap: run.scrapTotal })
         p.run = null
@@ -174,6 +220,10 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       return
     }
     run.markDefeat()
+    accounts.updateStats(p.accountId, (s) => {
+      s.battlesLost += 1
+    })
+    recordRunOver(p, run, false)
     p.socket?.emit('run:over', false, { column: run.column, scrap: run.scrapTotal })
     p.run = null
   }
@@ -187,7 +237,7 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
     let host: BattleHost | null = null
     host = new BattleHost(
       run.playerSetup(),
-      setupFromNpc(entry.template),
+      setupFromNpc(entry.template, entry.mod),
       { a: p, b: null },
       {
         ...hostConfigBase((result, sim): void => {
@@ -203,6 +253,8 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
         suddenDeathSec: null,
         backdropSeed: run.currentNode().seed,
         firstBattle: entry.firstBattle,
+        // Encounter flavour (e.g. a landed sneak attack); emitted once the battle is live.
+        introLog: entry.introLog,
       },
     )
     startHost(host)
@@ -232,15 +284,11 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
         pauseAllowed: true,
         suddenDeathSec: null,
         backdropSeed: run.currentNode().seed,
+        introLog:
+          '¡Emboscada! Mientras tu nave estaba a la deriva, una nave hostil te ha interceptado.',
       },
     )
     startHost(host)
-    p.socket?.emit('battle:events', [
-      {
-        t: 'log',
-        msg: '¡Emboscada! Mientras tu nave estaba a la deriva, una nave hostil te ha interceptado.',
-      },
-    ])
   }
 
   io.on('connection', (socket: GameSocket) => {
@@ -260,6 +308,18 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       if (player?.run) return player.run
       sendError('not_in_run', 'No tienes ninguna expedición activa.')
       return null
+    }
+
+    const asString = (v: unknown): string => (typeof v === 'string' ? v : '')
+
+    /** Links this session to an account after a successful auth, adopting its name. */
+    const bindAccount = (token: string | undefined): void => {
+      if (!player || !token) return
+      const id = accounts.accountIdForToken(token)
+      if (!id) return
+      player.accountId = id
+      const name = accounts.displayName(id)
+      if (name) player.name = name
     }
 
     // --- Session -----------------------------------------------------------
@@ -294,6 +354,40 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       socket.emit('lobby:state', { online: sessions.onlineCount(), queue: duelQueue.length })
     })
 
+    // --- Auth (optional accounts) ------------------------------------------
+
+    socket.on('auth:register', (username, password, cb) => {
+      if (typeof cb !== 'function') return
+      const res = accounts.register(asString(username), asString(password))
+      if (res.ok) bindAccount(res.token)
+      cb(res)
+    })
+
+    socket.on('auth:login', (username, password, cb) => {
+      if (typeof cb !== 'function') return
+      const res = accounts.login(asString(username), asString(password))
+      if (res.ok) bindAccount(res.token)
+      cb(res)
+    })
+
+    socket.on('auth:resume', (token, cb) => {
+      if (typeof cb !== 'function') return
+      const res = accounts.resume(asString(token))
+      if (res.ok) bindAccount(res.token)
+      cb(res)
+    })
+
+    socket.on('auth:logout', () => {
+      if (!player) return
+      player.accountId = null
+      player.name = `Capitán ${player.token.slice(0, 4).toUpperCase()}`
+    })
+
+    socket.on('auth:me', (cb) => {
+      if (typeof cb !== 'function') return
+      cb(player?.accountId ? accounts.profile(player.accountId) : null)
+    })
+
     // --- Queue / mode entry --------------------------------------------------
 
     socket.on('queue:join', (mode, loadout) => {
@@ -315,6 +409,9 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
           return sendError('bad_intent', 'Ya tienes una expedición en curso. Abandónala primero.')
         }
         p.run = new RunManager(setupFromLoadout(loadout, p.name), randomSeed())
+        accounts.updateStats(p.accountId, (s) => {
+          s.runsStarted += 1
+        })
         socket.emit('run:state', p.run.publicState())
         return
       }
@@ -406,10 +503,10 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       b.host.toggleDoor(b.side, doorId)
     })
 
-    socket.on('battle:jump', (charging) => {
+    socket.on('battle:jump', () => {
       const b = requireBattle()
       if (!b) return
-      b.host.setJumpCharging(b.side, Boolean(charging))
+      b.host.requestJump(b.side)
     })
 
     socket.on('battle:pause', (paused) => {
@@ -457,12 +554,22 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       const p = player
       const run = requireRun()
       if (!p || !run) return
+      if (p.battle) return sendError('bad_intent', 'Estás en pleno combate.')
       const res = run.resolveEventChoice(typeof choiceIdx === 'number' ? choiceIdx : -1)
-      if (res === 'invalid') return sendError('bad_intent', 'Esa opción no está disponible.')
-      socket.emit('run:state', run.publicState())
-      if (res === 'dead') {
-        socket.emit('run:over', false, { column: run.column, scrap: run.scrapTotal })
-        p.run = null
+      switch (res.kind) {
+        case 'invalid':
+          return sendError('bad_intent', 'Esa opción no está disponible.')
+        case 'battle':
+          // A pre-combat encounter choice that leads into the fight.
+          return startRunBattle(p, run, res.entry)
+        case 'dead':
+          recordRunOver(p, run, false)
+          socket.emit('run:state', run.publicState())
+          socket.emit('run:over', false, { column: run.column, scrap: run.scrapTotal })
+          p.run = null
+          return
+        case 'ok':
+          return socket.emit('run:state', run.publicState())
       }
     })
 
@@ -479,6 +586,7 @@ export function registerHandlers(io: GameServer, sessions: SessionRegistry): Han
       if (!p || !run) return
       if (p.battle) return sendError('bad_intent', 'Ríndete o huye para salir del combate.')
       run.markDefeat()
+      recordRunOver(p, run, false)
       socket.emit('run:over', false, { column: run.column, scrap: run.scrapTotal })
       p.run = null
     })

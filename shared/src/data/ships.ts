@@ -167,7 +167,6 @@ export const SHIPS: Record<ShipClassId, ShipClassDef> = {
         [1, 2],
         [2, 3],
         [4, 3],
-        [4, 7],
         [5, 6],
         [2, 6],
         [3, 6],

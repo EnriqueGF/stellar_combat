@@ -188,4 +188,98 @@ export const GAME_EVENTS: GameEventDef[] = [
       },
     ],
   },
+  {
+    id: 'smuggler_cache',
+    title: 'Alijo de contrabandistas',
+    text: 'Un contenedor sellado deriva oculto tras una luna, marcado con el glifo de un cártel de contrabando. Forzarlo podría darte un buen pellizco… o activar lo que sea que lo proteja.',
+    choices: [
+      {
+        label: 'Forzar el sello del contenedor',
+        outcomes: [
+          { weight: 5, text: 'Dentro brilla un cargamento de chatarra de primera y munición.', scrap: 22, ammo: 2 },
+          { weight: 3, text: 'Una carga trampa estalla al abrirlo y sacude el casco.', scrap: 6, hull: -4 },
+          { weight: 2, text: 'Solo lastre y polvo: alguien lo vació hace tiempo.' },
+        ],
+      },
+      {
+        label: 'Dejarlo: no te gusta ese glifo',
+        outcomes: [{ weight: 1, text: 'Hay deudas que no conviene heredar. Sigues tu ruta.' }],
+      },
+    ],
+  },
+  {
+    id: 'drifting_medic',
+    title: 'Médico a la deriva',
+    text: 'Una cápsula médica responde a tu hola: dentro, un cirujano de combate aterido pide ser recogido. «Puedo seros útil… o al menos pagaros el viaje».',
+    choices: [
+      {
+        label: 'Subirlo a bordo y atenderlo',
+        outcomes: [
+          { weight: 6, text: 'Agradecido, pone a punto la enfermería: tu tripulación sana sus heridas.', hull: 4 },
+          { weight: 4, text: 'Te paga el rescate con la chatarra que le quedaba.', scrap: 14 },
+        ],
+      },
+      {
+        label: 'Desviar energía y seguir',
+        outcomes: [{ weight: 1, text: 'Su señal se apaga a tu espalda. Nadie dice nada en el puente.' }],
+      },
+    ],
+  },
+  {
+    id: 'gravity_slingshot',
+    title: 'Tirachinas gravitatorio',
+    text: 'El pozo gravitatorio del gigante gaseoso podría catapultarte hacia el siguiente nodo y, de paso, dejar que el recolector pase rozando sus anillos.',
+    choices: [
+      {
+        label: 'Rozar los anillos a toda potencia',
+        outcomes: [
+          { weight: 6, text: 'El recolector se llena de hielo metálico mientras la nave surfea la gravedad.', scrap: 18 },
+          { weight: 4, text: 'Calculas mal el periastro y el casco cruje bajo la marea gravitatoria.', hull: -5 },
+        ],
+      },
+      {
+        label: 'Tomar la órbita segura',
+        outcomes: [{ weight: 1, text: 'Una maniobra limpia y aburrida. A veces es lo mejor.' }],
+      },
+    ],
+  },
+  {
+    id: 'rogue_ai',
+    title: 'IA huérfana',
+    text: 'Los restos de un crucero emiten en bucle la voz serena de su IA: «Mi tripulación ya no responde. Si me liberáis de este casco, os serviré bien». Algo en su tono eriza la piel.',
+    choices: [
+      {
+        label: 'Trasplantar su núcleo a tu nave',
+        outcomes: [
+          { weight: 5, text: 'La IA optimiza tus sistemas de tiro: rescatáis además un arma intacta.', weaponReward: true },
+          { weight: 5, text: 'En cuanto se conecta, fríe un relé y quema a quien la instalaba antes de aislarla.', crewDamage: 45 },
+        ],
+      },
+      {
+        label: 'Borrar el núcleo por seguridad',
+        outcomes: [{ weight: 1, text: 'La voz se apaga con un último «…comprendo». Recoges algo de chatarra del pecio.', scrap: 8 }],
+      },
+    ],
+  },
+  {
+    id: 'mining_guild',
+    title: 'Boya del gremio minero',
+    text: 'Una boya automática del gremio minero ofrece un contrato relámpago: marca un filón cercano a cambio de una comisión por adelantado.',
+    choices: [
+      {
+        label: 'Aceptar el contrato (−6 chatarra)',
+        outcomes: [
+          { weight: 7, text: 'El filón es generoso: amortizas la comisión con creces.', scrap: 20 },
+          { weight: 3, text: 'El filón estaba casi agotado. Apenas cubres gastos.', scrap: -2 },
+        ],
+      },
+      {
+        label: 'Rechazar y prospectar por tu cuenta',
+        outcomes: [
+          { weight: 4, text: 'Tu propio escáner da con una veta menor.', scrap: 9 },
+          { weight: 6, text: 'No encuentras nada que merezca el desvío.' },
+        ],
+      },
+    ],
+  },
 ]

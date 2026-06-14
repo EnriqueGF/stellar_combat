@@ -5,7 +5,7 @@
 // Settings persist in localStorage under 'sc_settings'.
 
 import { clamp } from '@stellar/shared'
-import type { BattleResult, BattleSnapshot, GameMode, LobbyState, RunStatePublic, Side } from '@stellar/shared'
+import type { BattleResult, BattleSnapshot, GameMode, LobbyState, Profile, RunStatePublic, Side } from '@stellar/shared'
 import type { GameSettings, GameStateStore } from './contracts'
 
 const SETTINGS_KEY = 'sc_settings'
@@ -37,6 +37,8 @@ export interface ClientState extends GameStateStore {
   /** Set by run:over; cleared when returning to the main menu. */
   runOver: RunOverSummary | null
   lobby: LobbyState | null
+  /** Signed-in account profile, or null when playing as a guest. */
+  profile: Profile | null
 }
 
 function num(v: unknown, fallback: number, min: number, max: number): number {
@@ -80,6 +82,7 @@ class Store implements ClientState {
   ammoAtBattleStart = 0
   runOver: RunOverSummary | null = null
   lobby: LobbyState | null = null
+  profile: Profile | null = null
 
   saveSettings(): void {
     try {

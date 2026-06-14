@@ -1,0 +1,93 @@
+---
+import '../styles/global.css'
+import { NAV, pager } from '../data/nav'
+
+interface Props {
+  title: string
+  /** Current page href without base (e.g. 'armas/'); '' for the home page. */
+  current: string
+  /** Short subtitle shown under the H1. */
+  lede?: string
+}
+
+const { title, current, lede } = Astro.props
+const base = import.meta.env.BASE_URL // '/wiki/'
+const { prev, next } = pager(current)
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · Stellar Combat — Wiki</title>
+    <meta name="description" content="Wiki de Stellar Combat: combate táctico espacial 1v1 inspirado en FTL." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar">
+        <button class="menu-toggle" id="menuToggle" aria-label="Menú">☰ Menú</button>
+        <a class="brand" href={base}>
+          <span class="logo">STELLAR <b>COMBAT</b></span>
+          <span class="tag">WIKI · combate táctico orbital</span>
+        </a>
+        <a class="play-link" href="/">▸ Volver al juego</a>
+        <div class="nav-scroll">
+          {
+            NAV.map((group) => (
+              <nav class="nav-group">
+                <h4>{group.title}</h4>
+                {group.items.map((item) => (
+                  <a href={`${base}${item.href}`} class={item.href === current ? 'active' : ''}>
+                    {item.title}
+                  </a>
+                ))}
+              </nav>
+            ))
+          }
+        </div>
+      </aside>
+
+      <main class="main">
+        <article class="content">
+          <h1>{title}</h1>
+          {lede && <p class="lede">{lede}</p>}
+          <slot />
+
+          <nav class="pager">
+            {
+              prev ? (
+                <a class="prev" href={`${base}${prev.href}`}>
+                  <small>◂ ANTERIOR</small>
+                  {prev.title}
+                </a>
+              ) : (
+                <span />
+              )
+            }
+            {
+              next && (
+                <a class="next" href={`${base}${next.href}`}>
+                  <small>SIGUIENTE ▸</small>
+                  {next.title}
+                </a>
+              )
+            }
+          </nav>
+        </article>
+      </main>
+    </div>
+
+    <script>
+      const t = document.getElementById('menuToggle')
+      const s = document.getElementById('sidebar')
+      t?.addEventListener('click', () => s?.classList.toggle('open'))
+    </script>
+  </body>
+</html>

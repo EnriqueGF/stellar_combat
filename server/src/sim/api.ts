@@ -6,6 +6,7 @@ import type {
   BattleResult,
   BattleSnapshot,
   CrewClassId,
+  CrewRaceId,
   DefenseModuleId,
   DroneId,
   Loadout,
@@ -21,6 +22,7 @@ export interface CrewSetup {
   id: string
   name: string
   cls: CrewClassId
+  race: CrewRaceId
   level: 1 | 2 | 3
   xp: number
   hp: number
@@ -36,6 +38,9 @@ export interface ShipSetup {
   reactor: number
   /** Installed system levels (absent = not installed). */
   systems: Partial<Record<SystemId, number>>
+  /** Saved energy distribution to restore (expedition carries it between battles).
+   *  Absent/empty = use the default initial distribution. */
+  power?: Partial<Record<SystemId, number>>
   weapons: WeaponId[]
   drones: DroneId[]
   defenseModule: DefenseModuleId
@@ -43,6 +48,16 @@ export interface ShipSetup {
   ammo: number
   /** Hegemon boss: enables phase-2 power surge at 50% hull. */
   boss?: boolean
+  /** Pre-combat advantage: light a fire in the weapons room at battle start. */
+  startFire?: boolean
+}
+
+/** Pre-combat encounter modifiers applied to the enemy ship setup (sneak attacks). */
+export interface BattleMod {
+  /** Scales the enemy's starting hull (a landed sneak attack leaves them damaged). */
+  enemyHullMult?: number
+  /** Start a fire aboard the enemy at the opening of the battle. */
+  enemyStartFire?: boolean
 }
 
 export interface BattleOptions {
@@ -73,7 +88,7 @@ export interface IBattleSim {
   moveCrew(side: Side, crewId: string, roomId: number): void
   toggleDrone(side: Side, droneSlot: number): void
   toggleDoor(side: Side, doorId: number): void
-  setJumpCharging(side: Side, charging: boolean): void
+  requestJump(side: Side): void
   surrender(side: Side): void
   /** Marks defeat for `side` with reason 'disconnect' (duel grace period expiry). */
   forfeit(side: Side): void

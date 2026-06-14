@@ -1,0 +1,77 @@
+---
+import Layout from '../layouts/Layout.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Tripulación y razas" current="tripulacion/" lede="Tus 4 tripulantes son el alma de la nave. Cada uno tiene una clase (qué sabe hacer) y una especie (cómo es), dos ejes independientes.">
+  <p>
+    Toda nave lleva <strong>4 tripulantes</strong>. Reparan sistemas, apagan incendios, sellan brechas y
+    <strong>potencian salas</strong> cuando las tripulan (un piloto en la cabina da evasión, un artillero
+    en armas acelera la carga…). Empiezan con 100 de vida base, se mueven a 1,6 salas/s y
+    <strong>suben de nivel usándose</strong>: cada acción da experiencia a su clase. En la pantalla de
+    equipamiento eliges la clase y la especie de cada puesto.
+  </p>
+
+  <h2>Clases — qué sabe hacer</h2>
+  <p>Hay cinco clases, cada una con tres niveles de maestría:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Clase</th><th>Especialidad</th><th>Nivel 1 → 2 → 3</th></tr></thead>
+      <tbody>
+        <tr><td>Piloto</td><td>Evasión al tripular la cabina</td><td>+5% → +8% → +12% de evasión</td></tr>
+        <tr><td>Ingeniero</td><td>Reparar sistemas</td><td>×1,25 → ×1,5 → ×2 de velocidad de reparación</td></tr>
+        <tr><td>Artillero</td><td>Cargar armas al tripular la sala de armas</td><td>+10% → +20% → +30% de velocidad de carga</td></tr>
+        <tr><td>Médico</td><td>Bahía médica y curar en su sala</td><td>bahía ×1,5/×2/×3 · cura 1/2/3 HP/s a compañeros de sala</td></tr>
+        <tr><td>Soldado</td><td>Apagar fuegos y aguante</td><td>apaga fuego ×1,5/×2/×3 · vida máx. 125/140/160</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">Subir de nivel: nivel 2 a los 60 puntos de experiencia y nivel 3 a los 180. Un piloto sube
+    pilotando, un ingeniero reparando, etc. El loadout «Equilibrado» suele llevar Piloto, Ingeniero,
+    Artillero y Médico.</p>
+
+  <div class="callout">
+    <span class="ctitle">Auto-tareas</span>
+    <p>Sin órdenes directas, cada tripulante atiende su sala con esta prioridad:
+      <strong>Fuego → Brecha → Reparar → Operar</strong>. Si no hay nada que hacer, vuelve a su puesto
+      asignado. Tu <strong>clic derecho</strong> manda y fija su puesto: úsalo para coordinar emergencias.</p>
+  </div>
+
+  <h2>Especies — cómo es</h2>
+  <p>
+    La especie es un eje aparte de la clase: define el aspecto (silueta y color, todo procedural) y unos
+    rasgos pasivos. El mismo Artillero juega muy distinto siendo un frágil Plasmoide o un tanque Pétreo.
+    Los multiplicadores toman como referencia 1 = humano.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Especie</th><th class="num">Vida</th><th class="num">Velocidad</th><th class="num">Reparar</th><th class="num">Apagar fuego</th><th class="num">Daño de fuego</th><th class="num">Asfixia</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="swatch" style="background:#d9a77f"></span>Humano</td><td class="num">×1</td><td class="num">×1</td><td class="num">×1</td><td class="num">×1</td><td class="num">×1</td><td class="num">×1</td></tr>
+        <tr><td><span class="swatch" style="background:#c8843c"></span>Pétreo</td><td class="num">×1,5</td><td class="num">×0,7</td><td class="num">×0,85</td><td class="num">×1,1</td><td class="num">×0,35</td><td class="num">×0,7</td></tr>
+        <tr><td><span class="swatch" style="background:#9fb6c4"></span>Autómata</td><td class="num">×0,8</td><td class="num">×1</td><td class="num">×1,6</td><td class="num">×1</td><td class="num">×1,5</td><td class="num">×0</td></tr>
+        <tr><td><span class="swatch" style="background:#6fae4f"></span>Mantíspido</td><td class="num">×1</td><td class="num">×1,6</td><td class="num">×0,6</td><td class="num">×1</td><td class="num">×1</td><td class="num">×1</td></tr>
+        <tr><td><span class="swatch" style="background:#f3f99d"></span>Plasmoide</td><td class="num">×0,55</td><td class="num">×1,35</td><td class="num">×1</td><td class="num">×1,3</td><td class="num">×0,6</td><td class="num">×0,4</td></tr>
+        <tr><td><span class="swatch" style="background:#a6d2e8"></span>Glacial</td><td class="num">×1,1</td><td class="num">×0,9</td><td class="num">×1</td><td class="num">×1,6</td><td class="num">×0,4</td><td class="num">×0,45</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="c-dim">«Daño de fuego» y «Asfixia» son el daño que <em>reciben</em>: menos es mejor (×0 = inmune).</p>
+
+  <div class="grid cols-2">
+    <div class="card"><h3><span class="swatch" style="background:#d9a77f"></span>Humano</h3><p class="desc">Adaptable y equilibrado: sin debilidades ni extremos. La opción comodín para cualquier puesto.</p></div>
+    <div class="card"><h3><span class="swatch" style="background:#c8843c"></span>Pétreo</h3><p class="desc">Coloso de silicato: mucha vida y aguanta el fuego, pero lento y torpe reparando. Perfecto como Soldado o para tripular salas en peligro.</p></div>
+    <div class="card"><h3><span class="swatch" style="background:#9fb6c4"></span>Autómata</h3><p class="desc">Unidad sintética: no respira (inmune a la asfixia) y repara rapidísimo, pero es frágil y sensible al fuego. Un Ingeniero ideal… lejos de las llamas.</p></div>
+    <div class="card"><h3><span class="swatch" style="background:#6fae4f"></span>Mantíspido</h3><p class="desc">Insectoide veloz: cruza la nave en un parpadeo para llegar a cualquier emergencia, aunque sus garras reparan despacio.</p></div>
+    <div class="card"><h3><span class="swatch" style="background:#f3f99d"></span>Plasmoide</h3><p class="desc">Ser de energía: ágil y resistente al fuego y al vacío, pero muy frágil. Brilla apagando incendios sin morir en el intento.</p></div>
+    <div class="card"><h3><span class="swatch" style="background:#a6d2e8"></span>Glacial</h3><p class="desc">Críita de mundos helados: la mejor apagando incendios y resiste bien sin oxígeno. El bombero de la nave.</p></div>
+  </div>
+
+  <div class="callout gold">
+    <span class="ctitle">Combina clase y especie</span>
+    <p>Un <strong>Soldado Pétreo</strong> es un muro contra el fuego; un <strong>Ingeniero Autómata</strong>
+      repara a una velocidad absurda; un <strong>Médico Glacial</strong> sobrevive a salas sin aire mientras
+      cura. Pensar estas parejas es parte de la estrategia del loadout.</p>
+  </div>
+</Layout>

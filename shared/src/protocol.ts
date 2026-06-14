@@ -24,6 +24,38 @@ export interface LobbyState {
   queue: number
 }
 
+// --- Accounts (optional registration / login) ---
+
+export interface AccountStats {
+  runsStarted: number
+  /** Runs finished by defeating the sector boss. */
+  runsWon: number
+  /** Deepest sector column ever reached. */
+  bestColumn: number
+  battlesWon: number
+  battlesLost: number
+  duelsWon: number
+  duelsLost: number
+  scrapEarned: number
+  crewLost: number
+}
+
+export interface Profile {
+  /** Captain display name. */
+  username: string
+  createdAt: number
+  stats: AccountStats
+}
+
+export interface AuthResult {
+  ok: boolean
+  /** Human-readable failure reason (Spanish), when ok is false. */
+  error?: string
+  /** Persistent auth token to store client-side, when ok is true. */
+  token?: string
+  profile?: Profile
+}
+
 export type UpgradeItem =
   | { kind: 'reactor' }
   | { kind: 'system'; system: SystemId }
@@ -61,6 +93,17 @@ export interface ClientToServerEvents {
   'session:hello': (token: string | null, cb: (token: string) => void) => void
   'lobby:subscribe': () => void
 
+  /** Create an account; binds this session to it on success. */
+  'auth:register': (username: string, password: string, cb: (res: AuthResult) => void) => void
+  /** Log into an existing account; binds this session to it on success. */
+  'auth:login': (username: string, password: string, cb: (res: AuthResult) => void) => void
+  /** Re-bind a session to an account from a stored token (on reconnect). */
+  'auth:resume': (token: string, cb: (res: AuthResult) => void) => void
+  /** Unbind the account (return to anonymous guest play). */
+  'auth:logout': () => void
+  /** Fetch the current account profile/stats (null if playing as guest). */
+  'auth:me': (cb: (profile: Profile | null) => void) => void
+
   'queue:join': (mode: GameMode, loadout: Loadout) => void
   'queue:leave': () => void
   /** Accept fighting an NPC instead of waiting for a human (duel queue). */
@@ -75,7 +118,8 @@ export interface ClientToServerEvents {
   'battle:toggle_drone': (droneSlot: number) => void
   /** Open/close a door (by DoorState.id) to control O2 flow and fire spread. */
   'battle:toggle_door': (doorId: number) => void
-  'battle:jump': (charging: boolean) => void
+  /** Jump away (flee) — only fires when the drive is charged and the engine room is manned. */
+  'battle:jump': () => void
   'battle:pause': (paused: boolean) => void
   'battle:surrender': () => void
 

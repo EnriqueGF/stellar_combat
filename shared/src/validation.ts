@@ -1,5 +1,5 @@
 import { CREW_SIZE, MAX_DRONES_EQUIPPED, WEAPON_BUDGET_POINTS } from './constants.js'
-import { CREW_CLASSES } from './data/crew.js'
+import { CREW_CLASSES, CREW_RACES } from './data/crew.js'
 import { DRONES } from './data/drones.js'
 import { DEFENSE_MODULES } from './data/modules.js'
 import { SHIPS } from './data/ships.js'
@@ -45,6 +45,11 @@ export function validateLoadout(loadout: Loadout): LoadoutValidation {
 
   if (loadout.crew.length !== CREW_SIZE) errors.push(`La tripulación debe ser de ${CREW_SIZE}.`)
   if (loadout.crew.some((c) => !CREW_CLASSES[c])) errors.push('Clase de tripulante no válida.')
+  if (loadout.crewRaces !== undefined) {
+    if (loadout.crewRaces.length !== loadout.crew.length)
+      errors.push('Las razas de la tripulación no coinciden con los puestos.')
+    if (loadout.crewRaces.some((r) => !CREW_RACES[r])) errors.push('Especie de tripulante no válida.')
+  }
 
   const weaponPowerNeeded = weaponDefs.reduce((a, w) => a + w.power, 0)
   const weaponPowerAvailable = ship?.systems.weapons ?? 0

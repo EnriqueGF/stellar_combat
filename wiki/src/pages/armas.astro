@@ -1,0 +1,120 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Cat from '../components/Cat.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="Armas" current="armas/" lede="Nueve armas en tres categorías. Montas las que quepan en 8 puntos de presupuesto y en los slots de tu nave.">
+  <p>
+    Cada arma cuesta <strong>puntos</strong> (que coinciden con su energía) y ocupa un
+    <strong>slot</strong> de tu nave. El presupuesto del loadout es de <strong>8 puntos</strong>; las naves
+    tienen 2, 3 o 4 slots. Recuerda el <a href={`${base}combate/`}>triángulo</a>: la categoría importa
+    tanto como el daño en bruto.
+  </p>
+
+  <div class="callout">
+    <span class="ctitle">Leyenda</span>
+    <p><strong>Pts</strong> = coste en presupuesto y energía para cargar · <strong>Daño</strong> = por
+      proyectil · <strong>Disparos</strong> = proyectiles por andanada · <strong>Recarga</strong> = segundos
+      a ritmo base (un <a href={`${base}tripulacion/`}>Artillero</a> la acelera). Las armas
+      <span class="c-explosive">explosivas</span> gastan <strong>munición</strong> (empiezas con 12, máx. 20).</p>
+  </div>
+
+  <h2>Tabla completa</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Arma</th><th>Cat.</th><th class="num">Pts</th><th class="num">Daño</th><th class="num">Disp.</th><th class="num">Recarga</th><th>Munición</th><th>Especial</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Láser Ligero</td><td class="c-energy">Energía</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">8 s</td><td class="c-dim">no</td><td>10% de prender fuego</td></tr>
+        <tr><td>Láser de Ráfaga</td><td class="c-energy">Energía</td><td class="num">2</td><td class="num">1</td><td class="num">2</td><td class="num">12 s</td><td class="c-dim">no</td><td>2 proyectiles seguidos</td></tr>
+        <tr><td>Haz Fundente</td><td class="c-energy">Energía</td><td class="num">2</td><td class="num">2</td><td class="num">1</td><td class="num">14 s</td><td class="c-dim">no</td><td>barre 2 salas · no falla · funde 1 capa si hay escudo</td></tr>
+        <tr><td>Cañón Gauss</td><td class="c-kinetic">Cinético</td><td class="num">1</td><td class="num">2</td><td class="num">1</td><td class="num">11 s</td><td class="c-dim">no</td><td>10% de brecha</td></tr>
+        <tr><td>Metralla</td><td class="c-kinetic">Cinético</td><td class="num">2</td><td class="num">1</td><td class="num">4</td><td class="num">14 s</td><td class="c-dim">no</td><td>4 fragmentos, −10% de precisión c/u</td></tr>
+        <tr><td>Magnetocañón</td><td class="c-kinetic">Cinético</td><td class="num">3</td><td class="num">4</td><td class="num">1</td><td class="num">18 s</td><td class="c-dim">no</td><td>+20% de brecha</td></tr>
+        <tr><td>Misil Colibrí</td><td class="c-explosive">Explosivo</td><td class="num">1</td><td class="num">2</td><td class="num">1</td><td class="num">13 s</td><td class="c-warn">sí</td><td>perfora 1 escudo</td></tr>
+        <tr><td>Misil Brecha</td><td class="c-explosive">Explosivo</td><td class="num">2</td><td class="num">3</td><td class="num">1</td><td class="num">17 s</td><td class="c-warn">sí</td><td>perfora 1 escudo · 50% de brecha</td></tr>
+        <tr><td>Bomba Ígnea</td><td class="c-explosive">Explosivo</td><td class="num">2</td><td class="num">2</td><td class="num">1</td><td class="num">15 s</td><td class="c-warn">sí</td><td>perfora TODO · 100% fuego · no daña casco</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><Cat c="energy" /> Energía — funde escudos</h2>
+  <p class="c-dim">Cadencia alta y sin munición. Brilla contra escudos (×1,25) y floja contra el casco (×0,75).</p>
+  <div class="grid cols-3">
+    <div class="card" style="border-top:3px solid var(--cat-energy)">
+      <h3>Láser Ligero</h3>
+      <p class="desc">Rápido y fiable. La recarga más corta del juego (8 s): ideal para ir raspando capas
+        de escudo sin parar.</p>
+      <div class="statline"><span><b>1</b> pt</span><span><b>1</b> daño</span><span><b>8 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-energy)">
+      <h3>Láser de Ráfaga</h3>
+      <p class="desc">Dispara 2 proyectiles seguidos. Excelente contra escudos: dos golpes derriban dos
+        medias-capas de una andanada.</p>
+      <div class="statline"><span><b>2</b> pts</span><span><b>1×2</b> daño</span><span><b>12 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-energy)">
+      <h3>Haz Fundente</h3>
+      <p class="desc">Un haz continuo que <strong>no falla</strong> y barre 2 salas (2 de daño en cada una).
+        Si hay escudos no entra, pero funde 1 capa. El servidor barre a la sala contigua con el sistema
+        más valioso.</p>
+      <div class="statline"><span><b>2</b> pts</span><span><b>2+2</b> daño</span><span><b>14 s</b></span></div>
+    </div>
+  </div>
+
+  <h2><Cat c="kinetic" /> Cinético — perfora cascos</h2>
+  <p class="c-dim">Proyectiles rápidos, sin munición. Brilla contra el casco (×1,25) y floja contra sistemas (×0,75).
+    No perforan escudos: úsalos cuando la defensa ya esté baja.</p>
+  <div class="grid cols-3">
+    <div class="card" style="border-top:3px solid var(--cat-kinetic)">
+      <h3>Cañón Gauss</h3>
+      <p class="desc">Proyectil magnético barato y eficaz contra el casco. El caballo de batalla cinético.</p>
+      <div class="statline"><span><b>1</b> pt</span><span><b>2</b> daño</span><span><b>11 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-kinetic)">
+      <h3>Metralla</h3>
+      <p class="desc">Nube de 4 fragmentos, poco precisos pero abrumadores. Genial para saturar la defensa
+        puntual y los drones del rival, o para rematar un casco desprotegido.</p>
+      <div class="statline"><span><b>2</b> pts</span><span><b>1×4</b> daño</span><span><b>14 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-kinetic)">
+      <h3>Magnetocañón</h3>
+      <p class="desc">El obús pesado: 4 de daño de un golpe y +20% de abrir brecha. Lento (18 s) y caro
+        (3 pts), pero demoledor contra el casco.</p>
+      <div class="statline"><span><b>3</b> pts</span><span><b>4</b> daño</span><span><b>18 s</b></span></div>
+    </div>
+  </div>
+
+  <h2><Cat c="explosive" /> Explosivo — revienta sistemas</h2>
+  <p class="c-dim">Perforan escudos y gastan munición. Brillan contra sistemas (×1,25) y flojean contra
+    escudos (×0,75) si los bloquean. Tu respuesta a un rival muy acorazado.</p>
+  <div class="grid cols-3">
+    <div class="card" style="border-top:3px solid var(--cat-explosive)">
+      <h3>Misil Colibrí</h3>
+      <p class="desc">Atraviesa 1 capa de escudo y pega donde quieras. Barato y versátil: el misil de
+        cabecera para llegar a un sistema concreto.</p>
+      <div class="statline"><span><b>1</b> pt</span><span><b>2</b> daño</span><span><b>13 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-explosive)">
+      <h3>Misil Brecha</h3>
+      <p class="desc">Cabeza perforante: atraviesa 1 escudo y abre brecha el <strong>50%</strong> de las
+        veces. Una brecha drena el O₂ y bloquea las reparaciones de esa sala.</p>
+      <div class="statline"><span><b>2</b> pts</span><span><b>3</b> daño</span><span><b>17 s</b></span></div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--cat-explosive)">
+      <h3>Bomba Ígnea</h3>
+      <p class="desc">Se <strong>teletransporta</strong> dentro de la nave enemiga ignorando todos los
+        escudos. No daña el casco: prende un incendio garantizado y castiga el sistema. Letal contra
+        salas tripuladas.</p>
+      <div class="statline"><span><b>2</b> pts</span><span><b>2</b> daño</span><span><b>15 s</b></span></div>
+    </div>
+  </div>
+
+  <div class="callout gold">
+    <span class="ctitle">Sobre la munición</span>
+    <p>Solo las armas explosivas gastan misiles. Empiezas con <strong>12</strong> y puedes llevar hasta
+      <strong>20</strong>. Sin munición, un arma explosiva no carga: repón en tiendas, eventos o la
+      pantalla de mejora. Un contador <strong>global</strong> de misiles abastece a toda la nave.</p>
+  </div>
+</Layout>

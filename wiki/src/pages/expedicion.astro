@@ -1,0 +1,117 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Figure from '../components/Figure.astro'
+const base = import.meta.env.BASE_URL
+---
+<Layout title="La expedición" current="expedicion/" lede="El modo campaña: una run roguelite por un sector hostil, ganando chatarra y mejorando tu nave hasta el jefe final.">
+  <p>
+    La Expedición es el corazón de Stellar Combat. Eliges una <a href={`${base}naves/`}>nave</a> y un
+    loadout inicial y te lanzas a cruzar un <strong>sector de 8 columnas</strong>. En cada paso decides tu
+    ruta, libras combates, vives eventos y gastas tu botín en mejoras. Una sola muerte termina la run: es
+    roguelite, sin guardado a mitad.
+  </p>
+
+  <h2>El mapa de sector</h2>
+  <Figure src="screenshots/sector.png" alt="Mapa de sector con nodos y rutas" caption="El sector: eliges entre los nodos accesibles. Solo ves los que has explorado o vislumbrado; el resto son balizas «?»." />
+  <p>
+    El sector es un grafo de nodos en 8 columnas. En las columnas 1–7 eliges entre 2–3 nodos; la columna 8
+    es siempre el <strong>jefe</strong>. Cada nodo tiene su planeta procedural de fondo. Solo conoces los
+    nodos que has visitado y sus vecinos inmediatos (explorados); los demás aparecen como incógnitas.
+  </p>
+  <h3>Tipos de nodo</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nodo</th><th class="num">Frecuencia</th><th>Qué es</th></tr></thead>
+      <tbody>
+        <tr><td>Combate</td><td class="num">≈46%</td><td>Un NPC estándar de la columna actual.</td></tr>
+        <tr><td>Élite</td><td class="num">≈13%</td><td>Enemigo más duro (usa la plantilla de la columna siguiente) y <strong>+50% de botín</strong>.</td></tr>
+        <tr><td>Evento</td><td class="num">≈28%</td><td>Una situación narrativa con opciones y resultados probabilísticos.</td></tr>
+        <tr><td>Tienda</td><td class="num">≈13%</td><td>Compra armas, drones, munición, reparaciones o tripulación con chatarra.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Encuentros antes del combate</h2>
+  <p>
+    Antes de cada combate (salvo el primero, que es a las armas directamente) surge un <strong>encuentro
+    narrativo</strong> estilo FTL: sabes a quién te enfrentas y eliges cómo afrontarlo. Algunas opciones
+    pelean, otras intentan ganar ventaja (un <strong>ataque por sorpresa</strong> que empieza con el enemigo
+    dañado y en llamas si sale bien) y otras evitan la pelea (<strong>eludir</strong> o pagar un
+    <strong>peaje</strong>, perdiendo el botín). Tienes el catálogo en
+    <a href={`${base}eventos/`}>Eventos y encuentros</a>.
+  </p>
+
+  <h2>La escalada de los NPCs</h2>
+  <p>Cuanto más avanzas, más duros son los enemigos. Esta es la progresión por columna:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="num">Col.</th><th>Enemigo</th><th class="num">Casco</th><th class="num">Reactor</th><th class="num">Escudos</th><th>Armamento</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Chatarrero Errante</td><td class="num">16</td><td class="num">4</td><td class="num">0 capas</td><td>Láser Ligero</td></tr>
+        <tr><td class="num">2</td><td>Corsario Ligero</td><td class="num">20</td><td class="num">6</td><td class="num">1 capa</td><td>Láser Ligero + Gauss</td></tr>
+        <tr><td class="num">3</td><td>Patrullero de la Hegemonía</td><td class="num">22</td><td class="num">8</td><td class="num">2 capas</td><td>Ráfaga + Gauss</td></tr>
+        <tr><td class="num">4</td><td>Cazador Pirata</td><td class="num">24</td><td class="num">9</td><td class="num">2 capas</td><td>Ráfaga + Misil Colibrí</td></tr>
+        <tr><td class="num">5</td><td>Guardián de Bloqueo</td><td class="num">26</td><td class="num">11</td><td class="num">3 capas</td><td>Ráfaga + Gauss + Colibrí</td></tr>
+        <tr><td class="num">6</td><td>Crucero de Asalto</td><td class="num">28</td><td class="num">12</td><td class="num">3 capas</td><td>Magnetocañón + Ráfaga + Colibrí</td></tr>
+        <tr><td class="num">7</td><td>Señor de la Guerra</td><td class="num">30</td><td class="num">14</td><td class="num">3 capas</td><td>Mag + Ráfaga + Metralla + Dron</td></tr>
+        <tr><td class="num">8</td><td>Acorazado Hegemón <span class="tag-pill danger">JEFE</span></td><td class="num">45</td><td class="num">16</td><td class="num">3 capas</td><td>Mag + Ráfaga + Misil Brecha + Dron</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <span class="ctitle">Diseño justo</span>
+    <p>La <strong>columna 1 es ganable con cualquier loadout inicial</strong> (el enemigo no tiene escudos):
+      es tu rampa de entrada. Las <strong>élites</strong> usan la plantilla de la columna siguiente, así que
+      una élite en la columna 3 pega como un enemigo de la 4 — pero suelta un 50% más de botín. El
+      <strong>jefe</strong> tiene dos fases: al bajar del 50% de casco recibe un subidón de energía que
+      alimenta más armas y motores.</p>
+  </div>
+
+  <h2>Botín y economía</h2>
+  <p>Tras cada victoria recibes:</p>
+  <ul>
+    <li><strong>Chatarra:</strong> 25 + un extra aleatorio (0–10) + 8 por columna. Más avanzas, más ganas.</li>
+    <li><strong>Munición:</strong> de 0 a 2 misiles.</li>
+    <li><strong>Arma suelta:</strong> 10% de probabilidad de que el enemigo suelte un arma que podrás comprar.</li>
+    <li>Las <strong>élites</strong> multiplican el botín por 1,5.</li>
+  </ul>
+  <p class="c-dim">Una run rinde alrededor de 320 de chatarra en total: suficiente para una progresión
+    sólida si eliges bien (mejorar reactor, escudos y un par de armas, y reparar lo justo).</p>
+
+  <h2>La pantalla de mejora</h2>
+  <p>Entre nodos gastas la chatarra en mejorar la nave:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Mejora</th><th>Coste</th></tr></thead>
+      <tbody>
+        <tr><td>Reactor +1</td><td>25 de chatarra (plano)</td></tr>
+        <tr><td>Subir un sistema un nivel</td><td>10 + 3 × nivel actual</td></tr>
+        <tr><td>Reparar casco</td><td>2 por punto</td></tr>
+        <tr><td>Munición</td><td>4 por cada 2 misiles</td></tr>
+        <tr><td>Comprar el arma soltada / de tienda</td><td>según la oferta</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Aquí cuentan los rasgos de nave: la <a href={`${base}naves/`}>Vanguardia</a> mejora armas un 25% más
+    barato y el <strong>Bastión</strong> mejora el reactor un 25% más barato. Las <strong>tiendas</strong>
+    amplían las opciones con drones, tripulación extra y armas concretas.
+  </p>
+
+  <h2>Riesgos de la run</h2>
+  <ul>
+    <li><strong>Derrota:</strong> si tu casco llega a 0 o muere toda tu tripulación, la run termina y vas a
+      la pantalla de resultado.</li>
+    <li><strong>Huir</strong> de un combate te salva, pero pierdes el botín de ese nodo.</li>
+    <li><strong>Desconexión en combate:</strong> la IA toma el control de tu nave hasta que vuelvas
+      (reconexión por token). Si tu nave muere mientras tanto, pierdes la run.</li>
+    <li><strong>Desconexión fuera de combate:</strong> la run queda «en órbita». Al reconectar hay un
+      <strong>25% de emboscada</strong>: un combate inmediato contra un NPC de tu columna actual.</li>
+  </ul>
+
+  <div class="callout ok">
+    <span class="ctitle">Plan de victoria</span>
+    <p>Llega al jefe con escudos altos, dos o tres armas que cubran el <a href={`${base}combate/`}>triángulo</a>
+      y munición de sobra. Apunta a sus armas y motores en la primera fase y prepárate para su frenesí al 50%.</p>
+  </div>
+</Layout>

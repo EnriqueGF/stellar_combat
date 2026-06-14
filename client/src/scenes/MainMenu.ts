@@ -13,6 +13,18 @@ import { addText, applyUiScale, css, menuChrome, type MenuChrome } from '../ui/h
 import { getState } from '../state'
 import { getNet, scOn } from '../net/socket'
 import { getAudio } from '../audio/engine'
+import { fadeInScene, goToScene } from '../ui/transition'
+import { MenuFlybys } from '../vfx/menuFlybys'
+import { openAuthModal, closeAuthModal } from '../ui/authModal'
+import {
+  drawAccountIcon,
+  drawDuelIcon,
+  drawExpeditionIcon,
+  drawGearIcon,
+  drawHelpIcon,
+  drawTutorialIcon,
+  drawWikiIcon,
+} from '../ui/menuIcons'
 
 const BIOMES: PlanetBiome[] = ['gas_giant', 'rocky', 'ice', 'volcanic', 'oceanic', 'desert']
 
@@ -20,6 +32,8 @@ export class MainMenuScene extends Phaser.Scene {
   private chrome: MenuChrome | null = null
   private onlineText: Phaser.GameObjects.Text | null = null
   private overlay: Phaser.GameObjects.Container | null = null
+  private flybys: MenuFlybys | null = null
+  private accountBtn: Button | null = null
 
   constructor() {
     super('MainMenu')
@@ -40,6 +54,11 @@ export class MainMenuScene extends Phaser.Scene {
       biome,
       seed,
       planet: { planetX: GAME_WIDTH * 0.74, planetY: GAME_HEIGHT * 0.42 },
+    })
+    this.flybys = new MenuFlybys(this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.flybys?.destroy()
+      this.flybys = null
     })
     getAudio().music('menu')
 
@@ -63,22 +82,34 @@ export class MainMenuScene extends Phaser.Scene {
     const ghost = { ...opts, variant: 'ghost' as const }
     new Button(this, bx, by, 'EXPEDICIÓN', () => {
       const data: LoadoutSceneData = { mode: 'expedition', timeoutSec: null }
-      this.scene.start('Loadout', data)
+      goToScene(this, 'Loadout', data)
     }, opts)
+    this.menuIcon(bx, by, opts.width, drawExpeditionIcon, COLORS.panelBorder)
     by += gap
     new Button(this, bx, by, 'DUELO PVP', () => {
       const data: LoadoutSceneData = { mode: 'duel', timeoutSec: PVP_LOADOUT_TIMEOUT_SEC }
-      this.scene.start('Loadout', data)
+      goToScene(this, 'Loadout', data)
     }, opts)
+    this.menuIcon(bx, by, opts.width, drawDuelIcon, COLORS.panelBorder)
     by += gap
     // Practice battle: the server starts it and battle:start routes us to Battle.
     new Button(this, bx, by, 'TUTORIAL', () => {
       getNet().socket.emit('tutorial:start')
     }, ghost)
+    this.menuIcon(bx, by, opts.width, drawTutorialIcon, COLORS.textDim)
     by += gap
     new Button(this, bx, by, 'CÓMO JUGAR', () => this.openHowTo(), ghost)
+    this.menuIcon(bx, by, opts.width, drawHelpIcon, COLORS.textDim)
     by += gap
     new Button(this, bx, by, 'OPCIONES', () => this.openOptions(), ghost)
+    this.menuIcon(bx, by, opts.width, drawGearIcon, COLORS.textDim)
+    by += gap
+    // Wiki: static Astro site served at /wiki (built into client/public/wiki).
+    // Opens in a new tab so the running game/session is left untouched.
+    new Button(this, bx, by, 'WIKI', () => {
+      window.open('/wiki/', '_blank', 'noopener')
+    }, ghost)
+    this.menuIcon(bx, by, opts.width, drawWikiIcon, COLORS.textDim)
 
     this.onlineText = addText(this, 16, GAME_HEIGHT - 26, '', 'body', 14, COLORS.textDim)
     this.refreshOnline()
@@ -86,8 +117,52 @@ export class MainMenuScene extends Phaser.Scene {
       this.refreshOnline()
     })
 
+    // Account button (top-right): opens the login/register/profile overlay.
+    const accW = 210
+    const accCx = GAME_WIDTH - 120
+    const accCy = 36
+    this.accountBtn = new Button(this, accCx, accCy, this.accountLabel(), () => openAuthModal(this), {
+      width: accW,
+      height: 38,
+      fontSize: 13,
+      variant: 'ghost',
+    })
+    this.menuIcon(accCx, accCy, accW, drawAccountIcon, COLORS.textDim, 18, 14)
+    scOn(this, 'auth', () => this.accountBtn?.setLabel(this.accountLabel()))
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => closeAuthModal())
+
     addText(this, GAME_WIDTH - 16, GAME_HEIGHT - 26, 'MVP v0.1', 'body', 13, COLORS.textDim)
       .setOrigin(1, 0)
+
+    fadeInScene(this)
+  }
+
+  private accountLabel(): string {
+    const profile = getState().profile
+    if (!profile) return 'INICIAR SESIÓN'
+    const name = profile.username.length > 12 ? `${profile.username.slice(0, 12)}…` : profile.username
+    return `▸ ${name}`
+  }
+
+  /**
+   * Draws a procedural menu icon at fixed standoff to the LEFT of a button's
+   * left edge, vertically centered on the button. Buttons are created by the
+   * shared Button class (not modified here); the icon is a separate Graphics so
+   * it never affects the button's hit area, hover, or the responsive camera.
+   * (cx, cy) is the button CENTER; `btnW` its width.
+   */
+  private menuIcon(
+    cx: number,
+    cy: number,
+    btnW: number,
+    draw: (g: Phaser.GameObjects.Graphics, x: number, y: number, s: number, color: number) => void,
+    color: number,
+    size = 22,
+    pad = 18,
+  ): void {
+    const ix = cx - btnW / 2 - pad - size / 2
+    const g = this.add.graphics()
+    draw(g, ix, cy, size, color)
   }
 
   private refreshOnline(): void {
